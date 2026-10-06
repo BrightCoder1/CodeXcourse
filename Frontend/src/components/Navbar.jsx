@@ -28,6 +28,14 @@ function Navbar() {
                         Login
                     </Link>
                 </li>
+
+                <li>
+                    <Link to="/register" className="login-btn">
+                        Register
+                    </Link>
+                </li>
+
+            
             </ul>
         </nav>
     );
