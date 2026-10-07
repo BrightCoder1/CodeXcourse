@@ -1,9 +1,11 @@
 import React, { useState } from "react";
 import "./Navbar.css";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -13,20 +15,24 @@ function Navbar() {
     setIsOpen(false);
   };
 
-  const scrollToSection = (e, sectionId) => {
-    e.preventDefault();
-    closeMenu(); // Auto close hamburger menu on phone when clicked
-
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
-    }
-  };
-
-  const scrollToTop = (e) => {
+  const handleNavClick = (e, sectionId) => {
     e.preventDefault();
     closeMenu();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    if (location.pathname === "/") {
+      // Home par hi hain toh directly scroll karein
+      if (!sectionId) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth" });
+      }
+    } else {
+      // Login se aa rahe hain toh targetSection state me bhej kar navigate karein
+      navigate("/", { state: { targetSection: sectionId } });
+    }
   };
 
   return (
@@ -34,12 +40,12 @@ function Navbar() {
       <nav className="navbar">
         {/* Logo */}
         <div className="logo">
-          <a href="#top" onClick={scrollToTop}>
+          <a href="/" onClick={(e) => handleNavClick(e, null)}>
             <img src="./Logo.png" alt="Logo" className="logo-img" />
           </a>
         </div>
 
-        {/* Hamburger / Cut (Close) Button for Mobile */}
+        {/* Hamburger Menu */}
         <button
           className={`hamburger ${isOpen ? "active" : ""}`}
           onClick={toggleMenu}
@@ -53,37 +59,34 @@ function Navbar() {
         {/* Nav Links */}
         <ul className={`nav-links ${isOpen ? "open" : ""}`}>
           <li>
-            <a href="#about" onClick={(e) => scrollToSection(e, "about")}>
+            <a href="/" onClick={(e) => handleNavClick(e, "about")}>
               About
             </a>
           </li>
 
           <li>
-            <a href="#course" onClick={(e) => scrollToSection(e, "course")}>
+            <a href="/" onClick={(e) => handleNavClick(e, "course")}>
               Course
             </a>
           </li>
 
           <li>
-            <a href="#contact" onClick={(e) => scrollToSection(e, "contact")}>
+            <a href="/" onClick={(e) => handleNavClick(e, "contact")}>
               Contact
             </a>
           </li>
 
           <li>
-            <a href="#blog" onClick={(e) => scrollToSection(e, "blog")}>
+            <a href="/" onClick={(e) => handleNavClick(e, "blog")}>
               Blog
             </a>
           </li>
 
+          {/* Login Route */}
           <li>
-            <a
-              href="#login"
-              className="login-btn"
-              onClick={(e) => scrollToSection(e, "login")}
-            >
+            <Link to="/login" className="login-btn" onClick={closeMenu}>
               Login
-            </a>
+            </Link>
           </li>
         </ul>
       </nav>
