@@ -1,0 +1,284 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ===============================
+   Desktop / Laptop Default Styles
+=============================== */
+.sidebar {
+  position: relative;
+  width: 250px;
+  height: 100vh;
+  background-color: #fbf6ec; /* Cream warm light background */
+  display: flex;
+  flex-direction: column;
+  padding: 24px 14px;
+  box-sizing: border-box;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+/* Minimize State for PC/Laptop */
+.sidebar.collapsed {
+  width: 80px;
+  padding: 24px 10px;
+}
+
+/* Header container */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding: 0 4px;
+}
+
+/* Brand styling */
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.brand-logo {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  background: #5013b8; /* Purple icon container */
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(80, 19, 184, 0.2);
+}
+
+.brand-title {
+  font-size: 19px;
+  font-weight: 700;
+  color: #121214;
+  letter-spacing: -0.3px;
+  transition: opacity 0.2s ease;
+}
+
+/* Desktop Minimize / Expand Button (Sticky pill on right border) */
+.desktop-collapse-btn {
+  position: absolute;
+  top: 30px;
+  right: -13px;
+  width: 26px;
+  height: 26px;
+  background-color: #211f2a;
+  color: #ffffff;
+  border: 2px solid #fbf6ec;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+}
+
+.desktop-collapse-btn:hover {
+  background-color: #5013b8;
+  transform: scale(1.1);
+}
+
+/* Navigation Links Container */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+/* Navigation Item */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: #2b2b2e;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+  white-space: nowrap;
+  position: relative;
+}
+
+.nav-item .nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+}
+
+.nav-item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Active Pill Shape */
+.nav-item.active {
+  background-color: #211f2a;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.nav-item.active .nav-icon svg {
+  stroke: #ffffff;
+}
+
+/* Bottom Section */
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* ====================================================
+   Collapsed Mode Adjustments & Tooltips (PC / Laptop)
+==================================================== */
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 12px 0;
+}
+
+.sidebar.collapsed .nav-label {
+  display: none;
+}
+
+/* Tooltip on hover when minimized */
+.sidebar.collapsed .nav-item:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 74px;
+  background-color: #211f2a;
+  color: #ffffff;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 200;
+  animation: fadeIn 0.15s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Hide mobile controls on desktop */
+.mobile-topbar,
+.mobile-close-btn,
+.mobile-backdrop {
+  display: none;
+}
+
+/* ==============================================
+   Mobile & Tablet Responsive Breakpoint (< 768px)
+============================================== */
+@media (max-width: 768px) {
+  /* Hide the desktop collapse chevron */
+  .desktop-collapse-btn {
+    display: none;
+  }
+
+  /* Show Top Header Bar for Mobile */
+  .mobile-topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background-color: #fbf6ec;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 90;
+  }
+
+  .mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .mobile-toggle-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #121214;
+    padding: 6px;
+    border-radius: 8px;
+  }
+
+  .mobile-toggle-btn:active {
+    background-color: rgba(0, 0, 0, 0.06);
+  }
+
+  /* Mobile Close Cross Button */
+  .mobile-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #121214;
+    padding: 4px;
+    border-radius: 6px;
+  }
+
+  /* Mobile Slide-out Drawer */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 270px !important;
+    height: 100vh;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+    z-index: 110;
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* Backdrop blur/dim */
+  .mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 105;
+  }
+
+  .mobile-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

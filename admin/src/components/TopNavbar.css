@@ -1,0 +1,201 @@
+/* =========================================
+   Top Navbar Styling
+========================================= */
+.top-navbar {
+  height: 72px;
+  background-color: #fbf6ec; /* Warm cream background */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* --- Search Input Container --- */
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: transparent;
+  border: 1px solid #e7ded0; /* Subtle warm border */
+  border-radius: 12px;
+  padding: 9px 16px;
+  width: 100%;
+  max-width: 320px;
+  transition: all 0.2s ease-in-out;
+}
+
+.search-box:focus-within {
+  border-color: #211f2a;
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.search-icon {
+  display: flex;
+  align-items: center;
+  color: #7d7a75;
+}
+
+.search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14.5px;
+  color: #1f1e24;
+  width: 100%;
+}
+
+.search-input::placeholder {
+  color: #8c8983;
+  font-weight: 400;
+}
+
+/* --- Right Side Actions --- */
+.top-navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Action Icon Buttons */
+.icon-btn {
+  position: relative;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 10px;
+  color: #1f1e24;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.icon-btn:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* Red Notification Indicator Dot */
+.notification-badge {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  background-color: #e54d42; /* Vibrant red */
+  border-radius: 50%;
+  border: 1.5px solid #fbf6ec;
+}
+
+/* --- Profile Section --- */
+.profile-wrapper {
+  position: relative;
+  margin-left: 6px;
+}
+
+.profile-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 20px;
+  transition: background-color 0.2s;
+  color: #1f1e24;
+}
+
+.profile-btn:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.profile-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.profile-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a191f;
+}
+
+/* Dropdown styling */
+.profile-dropdown {
+  position: absolute;
+  right: 0;
+  top: 48px;
+  width: 180px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  animation: dropdownFade 0.15s ease-out;
+}
+
+@keyframes dropdownFade {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-item {
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #2b2b2e;
+  text-decoration: none;
+  text-align: left;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dropdown-item:hover {
+  background: #fbf6ec;
+}
+
+.dropdown-divider {
+  border: none;
+  height: 1px;
+  background: #ece8df;
+  margin: 6px 0;
+}
+
+.logout-btn {
+  color: #e54d42;
+  font-weight: 500;
+}
+
+/* =========================================
+   Mobile Adjustments
+========================================= */
+@media (max-width: 768px) {
+  .top-navbar {
+    padding: 0 16px;
+    height: 64px;
+  }
+
+  .search-box {
+    max-width: 180px;
+  }
+
+  .profile-name {
+    display: none;
+  }
+}

@@ -1,0 +1,48 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+.dashboard_body {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    background-color: #fbf6ec;
+}
+
+.dashboard_main_wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.dashboard_content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+@media (max-width: 768px) {
+    .dashboard_body {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+        overflow-y: auto;
+    }
+
+    .dashboard_main_wrapper {
+        height: auto;
+        overflow: visible;
+        margin-top: 60px;
+    }
+
+    .dashboard_content {
+        padding: 16px;
+        overflow: visible;
+    }
+}
