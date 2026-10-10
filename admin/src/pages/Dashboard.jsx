@@ -10,7 +10,6 @@ const Dashboard = () => {
         <div className="dashboard-container">
             <DashboardHeader
                 title="Dashboard Overview"
-                subtitle="Welcome to Date: 18, 2024"
             />
 
             <DetailsOverview />

@@ -76,8 +76,8 @@ export default function TopNavbar({ onMenuClick }) {
                     {/* Optional Dropdown Menu */}
                     {dropdownOpen && (
                         <div className="profile-dropdown">
-                            <a href="#profile" className="dropdown-item">My Profile</a>
-                            <a href="#settings" className="dropdown-item">Account Settings</a>
+                            <a href="/profile" className="dropdown-item">My Profile</a>
+                            {/* <a href="#settings" className="dropdown-item">Account Settings</a> */}
                             <hr className="dropdown-divider" />
                             <button className="dropdown-item logout-btn">Log Out</button>
                         </div>

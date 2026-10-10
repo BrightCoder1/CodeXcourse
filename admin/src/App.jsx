@@ -9,6 +9,7 @@ import Student from './pages/Student';
 import Analytics from './pages/Analytics';
 import Finance from './pages/Finance';
 import Setting from './pages/Setting';
+import Profile from './pages/Profile';
 
 export default function App() {
   return (
@@ -23,11 +24,11 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path='/courses' element={<Course />} />
-              <Route path='/students' element={<Student /> }/>
-              <Route path='/analytics' element={<Analytics /> }/>
-              <Route path='/finances' element={<Finance /> }/>
-              <Route path='/settings' element={<Setting /> }/>
-
+              <Route path='/students' element={<Student />} />
+              <Route path='/analytics' element={<Analytics />} />
+              <Route path='/finances' element={<Finance />} />
+              <Route path='/settings' element={<Setting />} />
+              <Route path='/profile' element={<Profile />} />
             </Routes>
           </main>
         </div>

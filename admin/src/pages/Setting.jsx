@@ -1,17 +1,8 @@
 import React, { useState } from 'react';
 
 const Setting = () => {
-    const [activeTab, setActiveTab] = useState('general');
-
-    // General Settings State
-    const [generalSettings, setGeneralSettings] = useState({
-        instituteName: 'SkillSphere Academy',
-        adminEmail: 'admin@skillsphere.edu',
-        phone: '+91 98765 43210',
-        address: 'Tech Park Avenue, Sector 5, Bangalore, India',
-        currency: 'USD ($)',
-        timeZone: 'Asia/Kolkata (IST)',
-    });
+    // Default active tab set to security
+    const [activeTab, setActiveTab] = useState('security');
 
     // Security Settings State
     const [passwordData, setPasswordData] = useState({
@@ -35,11 +26,6 @@ const Setting = () => {
     const [allowPublicRegistration, setAllowPublicRegistration] = useState(true);
 
     // Form Handlers
-    const handleGeneralChange = (e) => {
-        const { name, value } = e.target;
-        setGeneralSettings((prev) => ({ ...prev, [name]: value }));
-    };
-
     const handlePasswordChange = (e) => {
         const { name, value } = e.target;
         setPasswordData((prev) => ({ ...prev, [name]: value }));
@@ -47,11 +33,6 @@ const Setting = () => {
 
     const handleNotificationToggle = (key) => {
         setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
-    };
-
-    const handleSaveGeneral = (e) => {
-        e.preventDefault();
-        alert('General settings successfully update ho gayi hain!');
     };
 
     const handleUpdatePassword = (e) => {
@@ -71,24 +52,13 @@ const Setting = () => {
                 <div>
                     <h2 className="settings-title">Admin Settings & Configuration</h2>
                     <p className="settings-subtitle">
-                        Manage institutional profile, admin security, notification alerts, and system controls
+                        Manage admin security, notification alerts, and system controls
                     </p>
                 </div>
             </div>
 
             {/* Settings Navigation Tabs */}
             <div className="settings-tabs-strip">
-                <button
-                    className={`tab-btn ${activeTab === 'general' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('general')}
-                >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                    </svg>
-                    Institute Profile
-                </button>
-
                 <button
                     className={`tab-btn ${activeTab === 'security' ? 'active' : ''}`}
                     onClick={() => setActiveTab('security')}
@@ -125,79 +95,7 @@ const Setting = () => {
 
             {/* Tab Panels */}
             <div className="settings-content-card">
-                {/* 1. General Institute Profile */}
-                {activeTab === 'general' && (
-                    <form onSubmit={handleSaveGeneral} className="settings-form">
-                        <h3 className="section-title">Institutional Information</h3>
-                        <p className="section-sub">Details will appear across generated fee slips and student reports</p>
-
-                        <div className="form-grid-2">
-                            <div className="form-field">
-                                <label>Institute / Organization Name</label>
-                                <input
-                                    type="text"
-                                    name="instituteName"
-                                    value={generalSettings.instituteName}
-                                    onChange={handleGeneralChange}
-                                    required
-                                />
-                            </div>
-
-                            <div className="form-field">
-                                <label>Master Admin Email</label>
-                                <input
-                                    type="email"
-                                    name="adminEmail"
-                                    value={generalSettings.adminEmail}
-                                    onChange={handleGeneralChange}
-                                    required
-                                />
-                            </div>
-
-                            <div className="form-field">
-                                <label>Helpline / Contact Phone</label>
-                                <input
-                                    type="text"
-                                    name="phone"
-                                    value={generalSettings.phone}
-                                    onChange={handleGeneralChange}
-                                />
-                            </div>
-
-                            <div className="form-field">
-                                <label>Base Currency</label>
-                                <select
-                                    name="currency"
-                                    value={generalSettings.currency}
-                                    onChange={handleGeneralChange}
-                                >
-                                    <option value="USD ($)">USD ($) - United States Dollar</option>
-                                    <option value="INR (₹)">INR (₹) - Indian Rupee</option>
-                                    <option value="EUR (€)">EUR (€) - Euro</option>
-                                    <option value="GBP (£)">GBP (£) - British Pound</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="form-field">
-                            <label>Campus Physical Address</label>
-                            <textarea
-                                rows="2"
-                                name="address"
-                                value={generalSettings.address}
-                                onChange={handleGeneralChange}
-                            ></textarea>
-                        </div>
-
-                        <div className="action-row">
-                            <button type="submit" className="save-btn">
-                                Save Profile Changes
-                            </button>
-                        </div>
-                    </form>
-                )}
-
-                {/* 2. Security & Authentication */}
+                {/* 1. Security & Authentication */}
                 {activeTab === 'security' && (
                     <div className="settings-section-stack">
                         <form onSubmit={handleUpdatePassword} className="settings-form">
@@ -287,7 +185,7 @@ const Setting = () => {
                     </div>
                 )}
 
-                {/* 3. Notification Preferences */}
+                {/* 2. Notification Preferences */}
                 {activeTab === 'notifications' && (
                     <div className="settings-section-stack">
                         <h3 className="section-title">Automated Notification Rules</h3>
@@ -367,7 +265,7 @@ const Setting = () => {
                     </div>
                 )}
 
-                {/* 4. System Controls & Maintenance */}
+                {/* 3. System Controls & Maintenance */}
                 {activeTab === 'system' && (
                     <div className="settings-section-stack">
                         <h3 className="section-title">System Health & Access Rules</h3>
