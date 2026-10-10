@@ -10,6 +10,8 @@ import Analytics from './pages/Analytics';
 import Finance from './pages/Finance';
 import Setting from './pages/Setting';
 import Profile from './pages/Profile';
+import Employee from './components/Employee';
+import EmployeeAdd from './components/EmployeeAdd';
 
 export default function App() {
   return (
@@ -29,6 +31,10 @@ export default function App() {
               <Route path='/finances' element={<Finance />} />
               <Route path='/settings' element={<Setting />} />
               <Route path='/profile' element={<Profile />} />
+              <Route path='/employees' element={<Employee />} />
+
+              {/* Sub Routes */}
+              <Route path='/employees/add' element={<EmployeeAdd />} />
             </Routes>
           </main>
         </div>

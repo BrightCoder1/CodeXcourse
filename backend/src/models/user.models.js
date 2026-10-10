@@ -28,7 +28,7 @@ const userSchema = mongoose.Schema({
     },
 }, { timestamps: true });
 
-//-->> Token generate
+
 userSchema.methods.generateToken = function (){
     return jwt.sign(
         {

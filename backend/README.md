@@ -185,6 +185,23 @@ Response:
 }
 ```
 
+### Employee Registration
+
+```http
+POST /api/employeeregister
+Content-Type: application/json
+```
+
+Required request fields: `employee_name`, `email`, `address`, `contact_number`,
+`dob`, `employee_qualification`, `bank_account`, `ifsc_code`, `password`,
+`emp_dpt`, `course`, `aadhar`, and `pan`. The server generates an immutable,
+unique `employee_id` for each new employee and returns it in the `employee`
+object. The optional `designation` field stores the employee's job title,
+separate from their account role. `POST /api/register` remains an alias for
+this endpoint. The admin dashboard submits this request through its Vite
+development proxy; run the backend on port `5000` or set `API_PROXY_TARGET` to
+the backend origin before starting the admin development server.
+
 ### 4) Get Profile
 
 ```http

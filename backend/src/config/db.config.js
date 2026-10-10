@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const URL = process.env.MONGO_URI || 'mongodb://localhost:27017/mernstack';
+const URL = process.env.MONGO_URI || 'mongodb://localhost:27017/codexcourse';
 
 const connectDB = async () => {
     try{
