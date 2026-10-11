@@ -1,10 +1,14 @@
 const express = require("express");
 const router = express.Router();
-const { registerUser, loginUser, getProfile, getlogout, updateProfile, deleteProfile } = require("./controllers/User.controller.js");
+const { registerUser, getEmployees, getEmployeeById, editEmployee, loginUser, getProfile, getlogout, updateProfile, deleteProfile } = require("./controllers/User.controller.js");
 const authMiddleware = require("./middleware/auth.middleware.js")
 
 
 router.post("/register", registerUser);
+router.get("/get/employee", getEmployees);
+router.get("/get/employee/:id", getEmployeeById);
+router.put("/update/employee/:id", editEmployee)
+
 router.post("/login", loginUser)
 router.get("/profile", authMiddleware, getProfile);
 router.get("/logout", getlogout)

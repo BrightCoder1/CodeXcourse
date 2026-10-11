@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
-import './App.css'; 
+import './App.css';
 import TopNavbar from './components/Topnavbar';
 import Dashboard from './pages/Dashboard';
 import Course from './pages/Course';
@@ -12,6 +12,7 @@ import Setting from './pages/Setting';
 import Profile from './pages/Profile';
 import Employee from './components/Employee';
 import EmployeeAdd from './components/EmployeeAdd';
+import EmployeeEdit from './components/EmployeeEdit';
 
 export default function App() {
   return (
@@ -35,6 +36,13 @@ export default function App() {
 
               {/* Sub Routes */}
               <Route path='/employees/add' element={<EmployeeAdd />} />
+
+              <Route
+                path="/employees/edit/:id"
+                element={<EmployeeEdit />}
+              />
+
+
             </Routes>
           </main>
         </div>

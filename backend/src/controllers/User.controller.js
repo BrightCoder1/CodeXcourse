@@ -1,4 +1,5 @@
 const User = require("../models/user.models.js");
+const mongoose = require("mongoose");
 
 const registerUser = async (req, res) => {
     const {
@@ -94,6 +95,182 @@ const registerUser = async (req, res) => {
         });
     }
 };
+
+
+
+// Get all employees
+const getEmployees = async (req, res) => {
+    try {
+        const employees = await User.find({ emp_role: "employee" })
+            .select("-password");
+
+        return res.status(200).json({
+            success: true,
+            data: employees
+        });
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch employees"
+        });
+    }
+};
+
+const getEmployeeById = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: "Employee ID is required",
+            });
+        }
+
+        let query;
+
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            query = {
+                $or: [{ _id: id }, { emp_id: id }],
+            };
+        } else {
+            query = { emp_id: id };
+        }
+
+        const employee = await User.findOne(query).select("-password");
+
+        if (!employee) {
+            return res.status(404).json({
+                success: false,
+                message: "Employee not found",
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: employee,
+        });
+    } catch (error) {
+        console.error("Get employee error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch employee",
+        });
+    }
+};
+
+const editEmployee = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: "Employee ID is required"
+            });
+        }
+
+        const query = mongoose.Types.ObjectId.isValid(id)
+            ? {
+                $or: [
+                    { _id: id },
+                    { emp_id: id }
+                ]
+            }
+            : { emp_id: id };
+
+        const employee = await User.findOne(query);
+
+        if (!employee) {
+            return res.status(404).json({
+                success: false,
+                message: "Employee not found"
+            });
+        }
+
+        const editableFields = [
+            "emp_name",
+            "email",
+            "contact_number",
+            "emp_dob",
+            "emp_qualification",
+            "emp_department",
+            "emp_course",
+            "emp_role",
+            "emp_joining_date",
+            "emp_status",
+            "emp_attendance",
+            "emp_aadharnumber",
+            "pan_number",
+            "address",
+            "accountnumber",
+            "ifsc_code"
+        ];
+
+        for (const field of editableFields) {
+            if (
+                Object.prototype.hasOwnProperty.call(
+                    req.body,
+                    field
+                )
+            ) {
+                const value = req.body[field];
+                employee[field] = [
+                    "emp_aadharnumber",
+                    "pan_number",
+                    "accountnumber",
+                    "ifsc_code"
+                ].includes(field) && typeof value === "string" && !value.trim()
+                    ? undefined
+                    : value;
+            }
+        }
+
+        // Update password only when a new password is provided.
+        // Ensure your User model hashes passwords before saving.
+        if (
+            typeof req.body.password === "string" &&
+            req.body.password.trim()
+        ) {
+            employee.password = req.body.password;
+        }
+
+        await employee.save();
+
+        const updatedEmployee = employee.toObject();
+        delete updatedEmployee.password;
+
+        return res.status(200).json({
+            success: true,
+            message: "Employee updated successfully",
+            data: updatedEmployee
+        });
+    } catch (err) {
+        if (err.name === "ValidationError") {
+            return res.status(400).json({
+                success: false,
+                message: Object.values(err.errors)
+                    .map((error) => error.message)
+                    .join(", ")
+            });
+        }
+
+        if (err.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message: "An employee with this email is already registered"
+            });
+        }
+
+        console.error("Update employee error:", err);
+        return res.status(500).json({
+            success: false,
+            message: err.message || "Failed to update employee"
+        });
+    }
+};
+
 
 
 
@@ -332,6 +509,10 @@ const deleteProfile = async (req, res) => {
 
 module.exports = {
     registerUser,
+    getEmployees,
+    getEmployeeById,
+    editEmployee,
+
     loginUser,
     getProfile,
     getlogout,
