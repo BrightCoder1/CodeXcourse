@@ -4,9 +4,7 @@ const { registerUser, loginUser, getProfile, getlogout, updateProfile, deletePro
 const authMiddleware = require("./middleware/auth.middleware.js")
 
 
-
 router.post("/register", registerUser);
-router.get("/get/users",);
 router.post("/login", loginUser)
 router.get("/profile", authMiddleware, getProfile);
 router.get("/logout", getlogout)
