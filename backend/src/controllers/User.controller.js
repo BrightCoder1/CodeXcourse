@@ -323,73 +323,61 @@ const deleteEmployee = async (req, res) => {
 };
 
 
-
-
 const loginUser = async (req, res) => {
+  try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({
-            success: false,
-            message: "Email and password are required."
-        });
+    if (!email?.trim() || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required.",
+      });
     }
 
-    try {
-        // Find user
-        const userFind = await User.findOne({ email });
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
 
-        if (!userFind) {
-            return res.status(401).json({
-                success: false,
-                message: "Email and Password are wrong!"
-            });
-        }
-
-        // Check password
-        const passwordMatches = await userFind.comparePassword(password);
-
-        if (!passwordMatches) {
-            return res.status(401).json({
-                success: false,
-                message: "Email and Password are wrong!"
-            });
-        }
-
-        // Generate JWT token
-        const token = await userFind.generateToken();
-
-        // Store token in cookie
-        res.cookie("token", token, {
-            httpOnly: true,
-            sameSite: "lax",
-            secure: process.env.NODE_ENV === "production"
-        });
-
-        // Remove password from response
-        const user = userFind.toObject();
-        delete user.password;
-
-        return res.status(200).json({
-            success: true,
-            message: "User Login Successfully!",
-            user,
-            token
-        });
-
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: error.message
-        });
+    if (
+      !user ||
+      user.emp_role !== "admin" ||
+      !(await user.comparePassword(password))
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password.",
+      });
     }
+
+    const token = user.generateToken();
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+
+    return res.status(200).json({
+      success: true,
+      token,
+      user: {
+        id: user._id.toString(),
+        emp_name: user.emp_name,
+        email: user.email,
+        emp_role: user.emp_role,
+      },
+    });
+  } catch (error) {
+    console.error("Admin login error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
 };
+
+// Profile controller me req.user return karein:
 
 
 
 const getProfile = async (req, res) => {
     try {
-        const user = await User.findById(req.user.userId)
+        const user = await User.findById(req.user._id)
             .select("-password");
 
         if (!user) {
@@ -447,7 +435,7 @@ const updateProfile = async (req, res) => {
         const { username, email, phone, address } = req.body;
 
         // Find logged-in user
-        const user = await User.findById(req.user.userId);
+        const user = await User.findById(req.user._id);
 
         if (!user) {
             return res.status(404).json({
@@ -517,7 +505,7 @@ const updateProfile = async (req, res) => {
 // ===============================
 const deleteProfile = async (req, res) => {
     try {
-        const userId = req.user.userId;
+        const userId = req.user._id;
 
         // Find user
         const user = await User.findById(userId);
@@ -563,7 +551,8 @@ module.exports = {
     getEmployeeById,
     editEmployee,
     deleteEmployee,
-    
+
+
     loginUser,
     getProfile,
     getlogout,
