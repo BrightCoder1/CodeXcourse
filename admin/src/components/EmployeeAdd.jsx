@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import axios from 'axios';
 
 // SVG Icons
 const Icons = {
@@ -17,38 +18,31 @@ const Icons = {
     </svg>
   ),
   Eye: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
       <circle cx="12" cy="12" r="3" />
     </svg>
   ),
   EyeOff: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
       <line x1="1" y1="1" x2="23" y2="23" />
     </svg>
   ),
-  Refresh: () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="23 4 23 10 17 10" />
-      <polyline points="1 20 1 14 7 14" />
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
-  ),
   User: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </svg>
   ),
   Briefcase: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
       <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
     </svg>
   ),
   FileText: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <polyline points="14 2 14 8 20 8" />
       <line x1="16" y1="13" x2="8" y2="13" />
@@ -56,7 +50,7 @@ const Icons = {
     </svg>
   ),
   Lock: () => (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
@@ -68,15 +62,13 @@ export default function EmployeeAdd() {
   const { id } = useParams();
   const isEditMode = Boolean(id);
 
-  // Form Fields State
   const [formData, setFormData] = useState({
     emp_name: '',
-    emp_id: '',
     emp_department: '',
     emp_course: '',
     emp_dob: '',
     emp_joining_date: new Date().toISOString().split('T')[0],
-    emp_role: '',
+    emp_role: 'employee', // Default role set to employee
     emp_status: 'Active',
     emp_attendance: '100%',
     emp_qualification: '',
@@ -94,18 +86,6 @@ export default function EmployeeAdd() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Auto-generate employee ID
-  const generateEmpId = () => {
-    const randomId = `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
-    setFormData((prev) => ({ ...prev, emp_id: randomId }));
-  };
-
-  useEffect(() => {
-    if (!isEditMode) {
-      generateEmpId();
-    }
-  }, [isEditMode]);
-
   // Handle inputs
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -121,7 +101,6 @@ export default function EmployeeAdd() {
     const newErrors = {};
 
     if (!formData.emp_name.trim()) newErrors.emp_name = 'Employee name is required';
-    if (!formData.emp_id.trim()) newErrors.emp_id = 'Employee ID is required';
     if (!formData.emp_department.trim()) newErrors.emp_department = 'Department is required';
     if (!formData.emp_course.trim()) newErrors.emp_course = 'Course is required';
     if (!formData.emp_role.trim()) newErrors.emp_role = 'Role is required';
@@ -165,8 +144,8 @@ export default function EmployeeAdd() {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Submit Handler
-  const handleSubmit = (e) => {
+  // Submit Handler using Axios
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!validateForm()) {
@@ -176,14 +155,22 @@ export default function EmployeeAdd() {
 
     setIsSubmitting(true);
 
-    // Save to API / LocalStorage / Context here
-    console.log('Employee Data Submitted:', formData);
-
-    setTimeout(() => {
-      setIsSubmitting(false);
-      alert(isEditMode ? 'Employee updated successfully!' : 'Employee added successfully!');
+    try {
+      if (isEditMode) {
+        await axios.put(`http://localhost:4000/api/register/${id}`, formData);
+        alert('Employee updated successfully!');
+      } else {
+        await axios.post('http://localhost:4000/api/register', formData);
+        alert('Employee added successfully!');
+      }
       navigate('/employees');
-    }, 500);
+    } catch (error) {
+      console.error('API Error:', error);
+      const errorMsg = error.response?.data?.message || 'Failed to save employee. Please try again.';
+      alert(errorMsg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -235,28 +222,6 @@ export default function EmployeeAdd() {
           </div>
 
           <div className="form-fields-grid">
-            {/* Employee ID */}
-            <div className="form-field">
-              <label>Employee ID <span className="req">*</span></label>
-              <div className="input-with-action">
-                <input
-                  type="text"
-                  name="emp_id"
-                  value={formData.emp_id}
-                  onChange={handleChange}
-                  placeholder="e.g. EMP-1010"
-                  className={errors.emp_id ? 'has-error' : ''}
-                />
-                {!isEditMode && (
-                  <button type="button" className="btn-icon-addon" onClick={generateEmpId} title="Regenerate ID">
-                    <Icons.Refresh />
-                  </button>
-                )}
-              </div>
-              {errors.emp_id && <span className="error-msg">{errors.emp_id}</span>}
-            </div>
-
-            {/* Employee Name */}
             <div className="form-field">
               <label>Employee Name <span className="req">*</span></label>
               <input
@@ -270,7 +235,6 @@ export default function EmployeeAdd() {
               {errors.emp_name && <span className="error-msg">{errors.emp_name}</span>}
             </div>
 
-            {/* Email */}
             <div className="form-field">
               <label>Email Address <span className="req">*</span></label>
               <input
@@ -284,7 +248,6 @@ export default function EmployeeAdd() {
               {errors.email && <span className="error-msg">{errors.email}</span>}
             </div>
 
-            {/* Contact Number */}
             <div className="form-field">
               <label>Contact Number <span className="req">*</span></label>
               <input
@@ -298,7 +261,6 @@ export default function EmployeeAdd() {
               {errors.contact_number && <span className="error-msg">{errors.contact_number}</span>}
             </div>
 
-            {/* Date of Birth */}
             <div className="form-field">
               <label>Date of Birth <span className="req">*</span></label>
               <input
@@ -311,7 +273,6 @@ export default function EmployeeAdd() {
               {errors.emp_dob && <span className="error-msg">{errors.emp_dob}</span>}
             </div>
 
-            {/* Qualification */}
             <div className="form-field">
               <label>Employee Qualification <span className="req">*</span></label>
               <input
@@ -327,7 +288,7 @@ export default function EmployeeAdd() {
           </div>
         </section>
 
-        {/* 2. Employment & Academic Information */}
+        {/* 2. Institutional & Role Details */}
         <section className="form-card">
           <div className="form-card-title">
             <span className="section-icon"><Icons.Briefcase /></span>
@@ -338,7 +299,6 @@ export default function EmployeeAdd() {
           </div>
 
           <div className="form-fields-grid">
-            {/* Department */}
             <div className="form-field">
               <label>Employee Department <span className="req">*</span></label>
               <select 
@@ -357,7 +317,6 @@ export default function EmployeeAdd() {
               {errors.emp_department && <span className="error-msg">{errors.emp_department}</span>}
             </div>
 
-            {/* Course */}
             <div className="form-field">
               <label>Assigned Course <span className="req">*</span></label>
               <input
@@ -371,21 +330,21 @@ export default function EmployeeAdd() {
               {errors.emp_course && <span className="error-msg">{errors.emp_course}</span>}
             </div>
 
-            {/* Role */}
+            {/* Employee Role Dropdown */}
             <div className="form-field">
               <label>Employee Role <span className="req">*</span></label>
-              <input
-                type="text"
+              <select
                 name="emp_role"
                 value={formData.emp_role}
                 onChange={handleChange}
-                placeholder="e.g. Senior Instructor, Lead Mentor"
                 className={errors.emp_role ? 'has-error' : ''}
-              />
+              >
+                <option value="employee">Employee</option>
+                <option value="admin">Admin</option>
+              </select>
               {errors.emp_role && <span className="error-msg">{errors.emp_role}</span>}
             </div>
 
-            {/* Joining Date */}
             <div className="form-field">
               <label>Joining Date <span className="req">*</span></label>
               <input
@@ -398,7 +357,6 @@ export default function EmployeeAdd() {
               {errors.emp_joining_date && <span className="error-msg">{errors.emp_joining_date}</span>}
             </div>
 
-            {/* Status */}
             <div className="form-field">
               <label>Employee Status</label>
               <select name="emp_status" value={formData.emp_status} onChange={handleChange}>
@@ -409,7 +367,6 @@ export default function EmployeeAdd() {
               </select>
             </div>
 
-            {/* Attendance Target */}
             <div className="form-field">
               <label>Initial Attendance Target / Rate</label>
               <input
@@ -434,7 +391,6 @@ export default function EmployeeAdd() {
           </div>
 
           <div className="form-fields-grid">
-            {/* Aadhaar Number */}
             <div className="form-field">
               <label>Aadhaar Number (12 Digits)</label>
               <input
@@ -449,7 +405,6 @@ export default function EmployeeAdd() {
               {errors.emp_aadharnumber && <span className="error-msg">{errors.emp_aadharnumber}</span>}
             </div>
 
-            {/* PAN Number */}
             <div className="form-field">
               <label>PAN Card Number</label>
               <input
@@ -465,7 +420,6 @@ export default function EmployeeAdd() {
               {errors.pan_number && <span className="error-msg">{errors.pan_number}</span>}
             </div>
 
-            {/* Address */}
             <div className="form-field full-width">
               <label>Residential Address</label>
               <textarea
@@ -490,7 +444,6 @@ export default function EmployeeAdd() {
           </div>
 
           <div className="form-fields-grid">
-            {/* Account Number */}
             <div className="form-field">
               <label>Bank Account Number</label>
               <input
@@ -504,7 +457,6 @@ export default function EmployeeAdd() {
               {errors.accountnumber && <span className="error-msg">{errors.accountnumber}</span>}
             </div>
 
-            {/* IFSC Code */}
             <div className="form-field">
               <label>Bank IFSC Code</label>
               <input
@@ -520,7 +472,6 @@ export default function EmployeeAdd() {
               {errors.ifsc_code && <span className="error-msg">{errors.ifsc_code}</span>}
             </div>
 
-            {/* Password */}
             <div className="form-field full-width">
               <label>Portal Login Password <span className="req">*</span></label>
               <div className="input-with-action">

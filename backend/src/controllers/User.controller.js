@@ -1,61 +1,103 @@
 const User = require("../models/user.models.js");
 
-
-// ===============================
-// REGISTER USER
-// ===============================
 const registerUser = async (req, res) => {
-    const { username, email, phone, password } = req.body;
+    const {
+        emp_name,
+        email,
+        contact_number,
+        emp_dob,
+        emp_qualification,
+        emp_department,
+        emp_course,
+        emp_role,
+        emp_joining_date,
+        emp_status,
+        emp_attendance,
+        emp_aadharnumber,
+        pan_number,
+        address,
+        accountnumber,
+        ifsc_code,
+        password,
+    } = req.body;
 
-    if (!username || !email || !phone || !password) {
+    // Validate required fields
+    if (
+        !emp_name ||
+        !email ||
+        !contact_number ||
+        !emp_dob ||
+        !emp_qualification ||
+        !emp_department ||
+        !emp_course ||
+        !emp_role ||
+        !password
+    ) {
         return res.status(400).json({
             success: false,
-            message: "All fields are required."
+            message: "Please fill in all required fields.",
         });
     }
 
     try {
-        // Check existing user
-        const existUser = await User.findOne({ email });
-
-        if (existUser) {
+        // Check if user with this email already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
             return res.status(409).json({
                 success: false,
-                message: "User already registered."
+                message: "An employee with this email is already registered.",
             });
         }
 
-        // Create user
-        const userCreate = await User.create({
-            username,
+        // Create employee record (emp_id is generated automatically by the pre-save hook)
+        const newUser = await User.create({
+            emp_name,
             email,
-            phone,
-            password
+            contact_number,
+            emp_dob,
+            emp_qualification,
+            emp_department,
+            emp_course,
+            emp_role,
+            emp_joining_date: emp_joining_date || Date.now(),
+            emp_status: emp_status || "Active",
+            emp_attendance: emp_attendance || "100%",
+            emp_aadharnumber,
+            pan_number,
+            address,
+            accountnumber,
+            ifsc_code,
+            password,
         });
 
-        // Remove password before sending response
-        const user = userCreate.toObject();
+        const user = newUser.toObject();
         delete user.password;
 
         return res.status(201).json({
             success: true,
-            message: "User registered successfully",
-            user
+            message: "Employee registered successfully.",
+            user,
         });
-
     } catch (error) {
+        // Handle Mongoose validation errors
+        if (error.name === "ValidationError") {
+            const messages = Object.values(error.errors).map((err) => err.message);
+            return res.status(400).json({
+                success: false,
+                message: messages.join(", "),
+            });
+        }
+
         return res.status(500).json({
             success: false,
-            message: error.message
+            message: error.message || "Internal server error occurred.",
         });
     }
 };
 
 
 
-// ===============================
-// LOGIN USER
-// ===============================
+
 const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
@@ -118,9 +160,6 @@ const loginUser = async (req, res) => {
 
 
 
-// ===============================
-// GET USER PROFILE
-// ===============================
 const getProfile = async (req, res) => {
     try {
         const user = await User.findById(req.user.userId)
@@ -149,9 +188,7 @@ const getProfile = async (req, res) => {
 
 
 
-// ===============================
-// LOGOUT USER
-// ===============================
+
 const getlogout = async (req, res) => {
     try {
         res.clearCookie("token", {

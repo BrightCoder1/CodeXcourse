@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
-import './App.css'; // or your global stylesheet
+import './App.css'; 
 import TopNavbar from './components/Topnavbar';
 import Dashboard from './pages/Dashboard';
 import Course from './pages/Course';
