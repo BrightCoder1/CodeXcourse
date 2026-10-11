@@ -89,6 +89,9 @@ export default function Employee() {
     fetchEmployees();
   }, []);
 
+
+  
+
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
     try {
@@ -125,12 +128,47 @@ export default function Employee() {
     navigate(`/employees/edit/${id}`);
   };
 
-  const handleDelete = (id, empName) => {
-    const confirmed = window.confirm(`Are you sure you want to delete employee "${empName}"?`);
-    if (confirmed) {
-      setEmployees((prev) => prev.filter((item) => (item._id !== id && item.emp_id !== id)));
+  const handleDelete = async (id) => {
+  if (!id) {
+    alert("Employee ID is missing");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "Are you sure you want to delete this employee?"
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const response = await axios.delete(
+      `http://localhost:4000/api/delete/employee/${encodeURIComponent(id)}`
+    );
+
+    if (response.data?.success === false) {
+      throw new Error(
+        response.data.message || "Failed to delete employee"
+      );
     }
-  };
+
+    alert("Employee deleted successfully");
+
+    // Reload the employee list
+    // Replace fetchEmployees() with your existing list-fetching function.
+    await fetchEmployees();
+  } catch (error) {
+    console.error(
+      "Delete employee error:",
+      error.response?.data || error.message
+    );
+
+    alert(
+      error.response?.data?.message ||
+      error.message ||
+      "Unable to delete employee"
+    );
+  }
+};
 
   return (
     <div className="employee-page">

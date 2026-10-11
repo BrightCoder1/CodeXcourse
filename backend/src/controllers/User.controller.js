@@ -273,6 +273,56 @@ const editEmployee = async (req, res) => {
 
 
 
+const deleteEmployee = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: "Employee ID is required",
+            });
+        }
+
+        let query;
+
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            query = {
+                $or: [{ _id: id }, { emp_id: id }],
+            };
+        } else {
+            query = { emp_id: id };
+        }
+
+        const employee = await User.findOneAndDelete(query);
+
+        if (!employee) {
+            return res.status(404).json({
+                success: false,
+                message: "Employee not found",
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Employee deleted successfully",
+            data: {
+                _id: employee._id,
+                emp_id: employee.emp_id,
+                emp_name: employee.emp_name,
+            },
+        });
+    } catch (error) {
+        console.error("Delete employee error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to delete employee",
+        });
+    }
+};
+
+
 
 
 const loginUser = async (req, res) => {
@@ -512,7 +562,8 @@ module.exports = {
     getEmployees,
     getEmployeeById,
     editEmployee,
-
+    deleteEmployee,
+    
     loginUser,
     getProfile,
     getlogout,
