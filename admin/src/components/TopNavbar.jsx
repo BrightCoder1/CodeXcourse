@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import './TopNavbar.css';
 
-// SVGs matching the visual design
 const Icons = {
     Search: () => (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -28,9 +29,25 @@ const Icons = {
     ),
 };
 
-export default function TopNavbar({ onMenuClick }) {
+export default function TopNavbar() {
     const [searchValue, setSearchValue] = useState('');
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const navigate = useNavigate();
+    const { user, logout } = useAuth();
+
+    const handleLogout = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDropdownOpen(false);
+
+        try {
+            await logout();
+        } catch (error) {
+            console.error('Logout request failed:', error);
+        } finally {
+            navigate('/c/admin/login', { replace: true });
+        }
+    };
 
     return (
         <header className="top-navbar">
@@ -42,43 +59,59 @@ export default function TopNavbar({ onMenuClick }) {
                     type="text"
                     placeholder="Search..."
                     value={searchValue}
-                    onChange={(e) => setSearchValue(e.target.value)}
+                    onChange={(event) => setSearchValue(event.target.value)}
                     className="search-input"
                 />
             </div>
 
             <div className="top-navbar-actions">
-                <button className="icon-btn" aria-label="Notifications">
+                <button type="button" className="icon-btn" aria-label="Notifications">
                     <Icons.Bell />
                     <span className="notification-badge" />
                 </button>
 
-                <button className="icon-btn" aria-label="Messages">
+                <button type="button" className="icon-btn" aria-label="Messages">
                     <Icons.Mail />
                 </button>
 
-                {/* User Profile dropdown */}
-                <div className="profile-wrapper">
+                <div className="profile-wrapper" style={{ position: 'relative' }}>
                     <button
+                        type="button"
                         className="profile-btn"
-                        onClick={() => setDropdownOpen(!dropdownOpen)}
+                        onClick={() => setDropdownOpen((open) => !open)}
                         aria-label="User menu"
+                        aria-expanded={dropdownOpen}
                     >
                         <img
                             src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces"
                             alt="Admin avatar"
                             className="profile-avatar"
                         />
-                        <span className="profile-name">Admin</span>
+                        <span className="profile-name">
+                            {user?.emp_name || 'Admin'}
+                        </span>
                         <Icons.ChevronDown />
                     </button>
 
-                    {/* Optional Dropdown Menu */}
                     {dropdownOpen && (
-                        <div className="profile-dropdown">
-                            <a href="/profile" className="dropdown-item">My Profile</a>
+                        <div className="profile-dropdown" style={{ position: 'absolute', right: 0, zIndex: 1000 }}>
+                            <Link
+                                to="/profile"
+                                className="dropdown-item"
+                                onClick={() => setDropdownOpen(false)}
+                            >
+                                My Profile
+                            </Link>
+
                             <hr className="dropdown-divider" />
-                            <button className="dropdown-item logout-btn">Log Out</button>
+
+                            <button
+                                type="button"
+                                className="dropdown-item logout-btn"
+                                onClick={handleLogout}
+                            >
+                                Log Out
+                            </button>
                         </div>
                     )}
                 </div>

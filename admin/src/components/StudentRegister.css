@@ -1,0 +1,78 @@
+.student-register-page {
+  width: 100%;
+  padding: 24px;
+  background: #fff;
+  border-radius: 12px;
+}
+
+.student-register-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.student-register-header h2 {
+  margin: 0 0 8px;
+}
+
+.student-register-header p {
+  margin: 0;
+  color: #6b7280;
+}
+
+.student-register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.student-register-form .form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.student-register-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.student-register-form label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.student-register-form input,
+.student-register-form select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.student-register-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+@media (max-width: 600px) {
+  .student-register-page {
+    padding: 16px;
+  }
+
+  .student-register-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .student-register-form .form-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -22,7 +22,6 @@ const registerUser = async (req, res) => {
         password,
     } = req.body;
 
-    // Validate required fields
     if (
         !emp_name ||
         !email ||
@@ -41,7 +40,6 @@ const registerUser = async (req, res) => {
     }
 
     try {
-        // Check if user with this email already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(409).json({
@@ -50,7 +48,6 @@ const registerUser = async (req, res) => {
             });
         }
 
-        // Create employee record (emp_id is generated automatically by the pre-save hook)
         const newUser = await User.create({
             emp_name,
             email,
@@ -80,7 +77,6 @@ const registerUser = async (req, res) => {
             user,
         });
     } catch (error) {
-        // Handle Mongoose validation errors
         if (error.name === "ValidationError") {
             const messages = Object.values(error.errors).map((err) => err.message);
             return res.status(400).json({
@@ -96,9 +92,6 @@ const registerUser = async (req, res) => {
     }
 };
 
-
-
-// Get all employees
 const getEmployees = async (req, res) => {
     try {
         const employees = await User.find({ emp_role: "employee" })
@@ -227,8 +220,6 @@ const editEmployee = async (req, res) => {
             }
         }
 
-        // Update password only when a new password is provided.
-        // Ensure your User model hashes passwords before saving.
         if (
             typeof req.body.password === "string" &&
             req.body.password.trim()
@@ -270,8 +261,6 @@ const editEmployee = async (req, res) => {
         });
     }
 };
-
-
 
 const deleteEmployee = async (req, res) => {
     try {
@@ -322,7 +311,6 @@ const deleteEmployee = async (req, res) => {
     }
 };
 
-
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -371,10 +359,6 @@ const loginUser = async (req, res) => {
   }
 };
 
-// Profile controller me req.user return karein:
-
-
-
 const getProfile = async (req, res) => {
     try {
         const user = await User.findById(req.user._id)
@@ -401,12 +385,8 @@ const getProfile = async (req, res) => {
     }
 };
 
-
-
-
 const getlogout = async (req, res) => {
     try {
-        
         res.clearCookie("token", {
             httpOnly: true,
             sameSite: "lax",
@@ -426,16 +406,10 @@ const getlogout = async (req, res) => {
     }
 };
 
-
-
-// ===============================
-// UPDATE USER PROFILE
-// ===============================
 const updateProfile = async (req, res) => {
     try {
         const { username, email, phone, address } = req.body;
 
-        // Find logged-in user
         const user = await User.findById(req.user._id);
 
         if (!user) {
@@ -445,14 +419,11 @@ const updateProfile = async (req, res) => {
             });
         }
 
-        // Update username
         if (username !== undefined) {
             user.username = username;
         }
 
-        // Update email
         if (email !== undefined && email !== user.email) {
-
             const existingUser = await User.findOne({ email });
 
             if (
@@ -468,20 +439,16 @@ const updateProfile = async (req, res) => {
             user.email = email;
         }
 
-        // Update phone
         if (phone !== undefined) {
             user.phone = phone;
         }
 
-        // Update address
         if (address !== undefined) {
             user.address = address;
         }
 
-        // Save changes
         await user.save();
 
-        // Remove password before response
         const updatedUser = user.toObject();
         delete updatedUser.password;
 
@@ -499,16 +466,10 @@ const updateProfile = async (req, res) => {
     }
 };
 
-
-
-// ===============================
-// DELETE USER PROFILE
-// ===============================
 const deleteProfile = async (req, res) => {
     try {
         const userId = req.user._id;
 
-        // Find user
         const user = await User.findById(userId);
 
         if (!user) {
@@ -518,10 +479,8 @@ const deleteProfile = async (req, res) => {
             });
         }
 
-        // Delete user
         await User.findByIdAndDelete(userId);
 
-        // Clear login cookie
         res.clearCookie("token", {
             httpOnly: true,
             sameSite: "lax",
@@ -544,16 +503,12 @@ const deleteProfile = async (req, res) => {
     }
 };
 
-
-
 module.exports = {
     registerUser,
     getEmployees,
     getEmployeeById,
     editEmployee,
     deleteEmployee,
-
-
     loginUser,
     getProfile,
     getlogout,

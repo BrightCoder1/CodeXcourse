@@ -8,7 +8,7 @@ import {
 } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
-import TopNavbar from "./components/Topnavbar";
+import TopNavbar from "./components/TopNavbar";
 import "./App.css";
 
 import Dashboard from "./pages/Dashboard";
@@ -26,6 +26,7 @@ import AdminLogin from "./pages/AdminLogin";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import StudentRegister from "./components/StudentRegister";
 
 function DashboardLayout() {
   return (
@@ -78,6 +79,9 @@ function AppRoutes() {
           <Route path="/finances" element={<Finance />} />
           <Route path="/settings" element={<Setting />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/student/register" element={<StudentRegister />} />
+
+
 
           <Route path="/employees" element={<Employee />} />
           <Route path="/employees/add" element={<EmployeeAdd />} />

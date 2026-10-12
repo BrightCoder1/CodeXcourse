@@ -5,7 +5,6 @@ const API = axios.create({
   withCredentials: true,
 });
 
-// Har request ke sath localStorage se token bhejta hai
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem("admin_token");
   if (token) {
@@ -26,7 +25,6 @@ const authService = {
     localStorage.setItem("admin_token", token);
 
     try {
-      // Confirm that the newly issued token passes the admin middleware.
       return await authService.checkAuth();
     } catch (error) {
       localStorage.removeItem("admin_token");
@@ -39,6 +37,7 @@ const authService = {
     if (!token) {
       throw new Error("No token found");
     }
+
     const response = await API.get("/profile");
     const user = response.data.user || response.data;
     if (user.emp_role !== "admin") {
@@ -51,6 +50,8 @@ const authService = {
   logout: async () => {
     try {
       await API.get("/logout");
+    } catch (error) {
+      console.error("Logout API error:", error);
     } finally {
       localStorage.removeItem("admin_token");
     }
