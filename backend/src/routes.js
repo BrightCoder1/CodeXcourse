@@ -19,6 +19,7 @@ const adminAuth = require("./middleware/adminAuth.js");
 router.post("/admin/login", loginUser);
 router.get("/logout", getlogout);
 
+
 // Admin-only management routes
 router.post("/register",  registerUser);
 router.get("/get/employee", getEmployees);
