@@ -1,479 +1,610 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import {
+  FaPlus,
+  FaSearch,
+  FaEye,
+  FaEdit,
+  FaTrash,
+  FaTimes,
+  FaUserTie,
+  FaGraduationCap
+} from 'react-icons/fa';
 
-const initialCourses = [
-  {
-    id: 1,
-    name: 'Introduction to Python Programming',
-    code: 'CS-PY101',
-    instructor: 'Dr. Sarah Mitchell',
-    startDate: '2024-08-01',
-    endDate: '2024-11-30',
-    image: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=600&auto=format&fit=crop&q=60',
-    status: 'Active'
-  },
-  {
-    id: 2,
-    name: 'Modern React & Next.js Architecture',
-    code: 'CS-RCT202',
-    instructor: 'Alex Rivera',
-    startDate: '2024-08-15',
-    endDate: '2024-12-10',
-    image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=600&auto=format&fit=crop&q=60',
-    status: 'Active'
-  },
-  {
-    id: 3,
-    name: 'UI/UX Design Systems & Figma',
-    code: 'DES-301',
-    instructor: 'Elena Rostova',
-    startDate: '2024-09-01',
-    endDate: '2024-12-15',
-    image: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?w=600&auto=format&fit=crop&q=60',
-    status: 'Inactive'
-  },
-  {
-    id: 4,
-    name: 'Full Stack MERN Web Development',
-    code: 'FS-MERN401',
-    instructor: 'Vikram Mehta',
-    startDate: '2024-09-10',
-    endDate: '2025-01-20',
-    image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=60',
-    status: 'Active'
-  },
-  {
-    id: 5,
-    name: 'Data Structures & Algorithms in Java',
-    code: 'CS-DSA205',
-    instructor: 'Prof. Rajesh Sharma',
-    startDate: '2024-08-20',
-    endDate: '2024-12-25',
-    image: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=600&auto=format&fit=crop&q=60',
-    status: 'Active'
-  },
-  {
-    id: 6,
-    name: 'Machine Learning & Deep Neural Nets',
-    code: 'AI-ML502',
-    instructor: 'Dr. Ananya Iyer',
-    startDate: '2024-10-01',
-    endDate: '2025-02-15',
-    image: 'https://images.unsplash.com/photo-1507146426996-ef0538821e1b?w=600&auto=format&fit=crop&q=60',
-    status: 'Inactive'
-  },
-  {
-    id: 7,
-    name: 'DevOps: Docker, Kubernetes & CI/CD',
-    code: 'DO-K8S303',
-    instructor: 'Marcus Vance',
-    startDate: '2024-09-15',
-    endDate: '2024-12-30',
-    image: 'https://images.unsplash.com/photo-1618401471353-b98afee0b2eb?w=600&auto=format&fit=crop&q=60',
-    status: 'Active'
-  },
-  {
-    id: 8,
-    name: 'Cybersecurity & Ethical Hacking',
-    code: 'SEC-ETH108',
-    instructor: 'Nathan Drake',
-    startDate: '2024-10-10',
-    endDate: '2025-01-15',
-    image: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?w=600&auto=format&fit=crop&q=60',
-    status: 'Inactive'
-  },
-  {
-    id: 9,
-    name: 'Cloud Computing with AWS & Azure',
-    code: 'CLD-AW704',
-    instructor: 'Pooja Kapoor',
-    startDate: '2024-08-25',
-    endDate: '2024-11-28',
-    image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=60',
-    status: 'Active'
-  },
-  {
-    id: 10,
-    name: 'Database Engineering: SQL & MongoDB',
-    code: 'DB-ENG204',
-    instructor: 'Kavita Nair',
-    startDate: '2024-09-05',
-    endDate: '2024-12-20',
-    image: 'https://images.unsplash.com/photo-1544383835-bda2bc66a55d?w=600&auto=format&fit=crop&q=60',
-    status: 'Active'
-  }
-];
+const API_BASE_URL = 'http://localhost:4000/api/courses';
 
-const emptyFormData = {
-  name: '',
-  code: '',
-  instructor: '',
-  startDate: '',
-  endDate: '',
-  image: '',
-  status: 'Active'
+const initialFormData = {
+  courseName: '',
+  courseCode: '',
+  instructorName: '',
+  teacherName: '',
+  qualification: '',
+  startingDate: '',
+  endingDate: '',
+  status: 'Active',
+  courseImageUrl: ''
 };
 
 const Course = () => {
-  const [courses, setCourses] = useState(initialCourses);
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCourseId, setEditingCourseId] = useState(null);
-  const [formData, setFormData] = useState(emptyFormData);
 
+  // Modal States
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState(null);
+  const [formData, setFormData] = useState(initialFormData);
+
+  // View Details Modal State
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+
+  // Auth Header helper
+  const getAuthHeaders = () => {
+    const token =
+      localStorage.getItem('admin_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('adminToken');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+  };
+
+  // 1. Fetch All Courses from MongoDB
+  const fetchCourses = async () => {
+    setLoading(true);
+    setErrorMessage('');
+    try {
+      const res = await axios.get(API_BASE_URL, {
+        headers: getAuthHeaders(),
+        withCredentials: true
+      });
+      const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      setCourses(data);
+    } catch (err) {
+      console.error('Fetch Courses Error:', err);
+      setErrorMessage(err.response?.data?.message || 'Failed to fetch courses from backend.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  // Form input handler
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Open modal for new course
-  const handleOpenAddModal = () => {
+  // Open modal for Adding
+  const handleOpenAdd = () => {
     setEditingCourseId(null);
-    setFormData(emptyFormData);
-    setIsModalOpen(true);
+    setFormData(initialFormData);
+    setIsFormModalOpen(true);
   };
 
-  // Open modal to edit existing course
-  const handleOpenEditModal = (course) => {
-    setEditingCourseId(course.id);
+  // Open modal for Editing
+  const handleOpenEdit = (course) => {
+    const id = course._id || course.id;
+    setEditingCourseId(id);
     setFormData({
-      name: course.name,
-      code: course.code,
-      instructor: course.instructor,
-      startDate: course.startDate,
-      endDate: course.endDate,
-      image: course.image,
-      status: course.status
+      courseName: course.courseName || '',
+      courseCode: course.courseCode || '',
+      instructorName: course.instructorName || '',
+      teacherName: course.teacherName || '',
+      qualification: course.qualification || '',
+      startingDate: course.startingDate ? course.startingDate.split('T')[0] : '',
+      endingDate: course.endingDate ? course.endingDate.split('T')[0] : '',
+      status: course.status || 'Active',
+      courseImageUrl: course.courseImageUrl || ''
     });
-    setIsModalOpen(true);
+    setIsFormModalOpen(true);
   };
 
-  // Delete course
-  const handleDeleteCourse = (id) => {
-    const isConfirmed = window.confirm('Are you sure you want to delete this course?');
-    if (isConfirmed) {
-      setCourses((prev) => prev.filter((item) => item.id !== id));
+  // Open modal for Viewing Details
+  const handleOpenView = async (course) => {
+    const id = course._id || course.id;
+    try {
+      const res = await axios.get(`${API_BASE_URL}/${id}`, {
+        headers: getAuthHeaders(),
+        withCredentials: true
+      });
+      if (!res.data?.data) {
+        throw new Error('Course details were not returned by the server.');
+      }
+      setSelectedCourse(res.data.data);
+      setViewModalOpen(true);
+    } catch (err) {
+      console.error('Fetch Course Details Error:', err);
+      alert(err.response?.data?.message || err.message || 'Failed to fetch course details.');
     }
   };
 
-  // Save (Create or Update)
-  const handleSaveCourse = (e) => {
+  // 2. Create or Update Course API
+  const handleSaveCourse = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.code.trim()) return;
-
-    if (editingCourseId) {
-      // Edit mode
-      setCourses((prev) =>
-        prev.map((c) =>
-          c.id === editingCourseId
-            ? {
-                ...c,
-                ...formData,
-                image:
-                  formData.image ||
-                  'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=60'
-              }
-            : c
-        )
-      );
-    } else {
-      // Add mode
-      const newCourse = {
-        id: Date.now(),
+    try {
+      const payload = {
         ...formData,
-        image:
-          formData.image ||
+        courseImageUrl:
+          formData.courseImageUrl ||
           'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=60'
       };
-      setCourses([newCourse, ...courses]);
-    }
 
-    setIsModalOpen(false);
-    setFormData(emptyFormData);
-    setEditingCourseId(null);
+      if (editingCourseId) {
+        // PUT Update
+        const res = await axios.put(`${API_BASE_URL}/${editingCourseId}`, payload, {
+          headers: getAuthHeaders(),
+          withCredentials: true
+        });
+        const updated = res.data?.data;
+        if (!updated) throw new Error('Updated course was not returned by the server.');
+        setCourses((prev) =>
+          prev.map((c) => ((c._id || c.id) === editingCourseId ? { ...c, ...updated } : c))
+        );
+        alert('Course updated successfully!');
+      } else {
+        // POST Create
+        const res = await axios.post(API_BASE_URL, payload, {
+          headers: getAuthHeaders(),
+          withCredentials: true
+        });
+        const created = res.data?.data;
+        if (!created) throw new Error('Created course was not returned by the server.');
+        setCourses((prev) => [created, ...prev]);
+        alert('Course added successfully!');
+      }
+
+      setIsFormModalOpen(false);
+      setFormData(initialFormData);
+      setEditingCourseId(null);
+    } catch (err) {
+      console.error('Save Course Error:', err);
+      alert(err.response?.data?.message || err.message || 'Error occurred while saving course.');
+    }
   };
 
-  // Live filter for search and status
+  // 3. Delete Course API
+  const handleDeleteCourse = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this course record?')) return;
+
+    try {
+      await axios.delete(`${API_BASE_URL}/${id}`, {
+        headers: getAuthHeaders(),
+        withCredentials: true
+      });
+      setCourses((prev) => prev.filter((c) => (c._id || c.id) !== id));
+      alert('Course deleted successfully!');
+    } catch (err) {
+      console.error('Delete Course Error:', err);
+      alert(err.response?.data?.message || 'Failed to delete course.');
+    }
+  };
+
+  // Search & Status Filtering
   const filteredCourses = courses.filter((course) => {
     const q = searchQuery.toLowerCase().trim();
+    const name = (course.courseName || '').toLowerCase();
+    const code = (course.courseCode || '').toLowerCase();
+    const instructor = (course.instructorName || '').toLowerCase();
+    const teacher = (course.teacherName || '').toLowerCase();
+    const status = course.status || 'Active';
+
     const matchesSearch =
       q === '' ||
-      course.name.toLowerCase().includes(q) ||
-      course.code.toLowerCase().includes(q) ||
-      course.instructor.toLowerCase().includes(q);
+      name.includes(q) ||
+      code.includes(q) ||
+      instructor.includes(q) ||
+      teacher.includes(q);
 
     const matchesStatus =
-      statusFilter === 'All' ||
-      course.status.toLowerCase() === statusFilter.toLowerCase();
+      statusFilter === 'All' || status.toLowerCase() === statusFilter.toLowerCase();
 
     return matchesSearch && matchesStatus;
   });
 
   return (
-    <div className="course-module-container">
-      {/* Top Header & Controls */}
-      <div className="course-top-bar">
-        <div className="course-title-section">
-          <h2 className="section-title">Courses Management</h2>
-          <p className="section-subtitle">
-            Manage course syllabus, active status, schedules, and faculty
+    <div style={{ padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'sans-serif' }}>
+      {/* Top Header & Actions Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+        <div>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>Courses Management</h2>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '4px' }}>
+            Manage curriculum, faculty instructors, schedules and active courses
           </p>
         </div>
 
-        <div className="course-actions">
-          {/* Status Filter */}
-          <div className="course-filter-wrapper">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="course-status-select"
-            >
-              <option value="All">All Status</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </div>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Status Dropdown */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{ padding: '9px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#fff', fontSize: '0.9rem', cursor: 'pointer' }}
+          >
+            <option value="All">All Status</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            <option value="Upcoming">Upcoming</option>
+            <option value="Completed">Completed</option>
+          </select>
 
           {/* Search Box */}
-          <div className="course-search-wrapper">
-            <svg
-              className="search-icon"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+          <div style={{ position: 'relative' }}>
+            <FaSearch style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }} />
             <input
               type="text"
-              placeholder="Search course, code, or teacher..."
+              placeholder="Search by course, code, teacher..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="course-search-input"
+              style={{ padding: '9px 14px 9px 36px', borderRadius: '8px', border: '1px solid #cbd5e1', width: '240px', fontSize: '0.9rem', outline: 'none' }}
             />
           </div>
 
           {/* Add Course Button */}
-          <button className="add-course-btn" onClick={handleOpenAddModal}>
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            <span>Add Course</span>
+          <button
+            type="button"
+            onClick={handleOpenAdd}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#2563eb', color: '#fff', padding: '9px 16px', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer', transition: '0.2s' }}
+          >
+            <FaPlus size={14} /> Add Course
           </button>
         </div>
       </div>
 
+      {/* Error Banner */}
+      {errorMessage && (
+        <div style={{ backgroundColor: '#fee2e2', border: '1px solid #f87171', color: '#b91c1c', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px' }}>
+          {errorMessage}
+        </div>
+      )}
+
       {/* Courses Cards Grid */}
-      <div className="courses-grid">
-        {filteredCourses.length > 0 ? (
-          filteredCourses.map((course) => (
-            <div key={course.id} className="course-card">
-              <div className="course-card-image-box">
-                <img
-                  src={course.image}
-                  alt={course.name}
-                  className="course-card-img"
-                />
-                <span className="course-code-tag">{course.code}</span>
-                <span
-                  className={`course-status-badge ${course.status.toLowerCase()}`}
-                >
-                  {course.status}
-                </span>
-              </div>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b', fontSize: '1.1rem' }}>
+          Loading course records...
+        </div>
+      ) : filteredCourses.length > 0 ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}>
+          {filteredCourses.map((course) => {
+            const courseId = course._id || course.id;
+            const statusStyle =
+              course.status === 'Active'
+                ? { bg: '#dcfce7', text: '#15803d' }
+                : course.status === 'Upcoming'
+                ? { bg: '#e0e7ff', text: '#4338ca' }
+                : { bg: '#fee2e2', text: '#b91c1c' };
 
-              <div className="course-card-content">
-                <h3 className="course-name">{course.name}</h3>
-
-                <div className="teacher-info">
-                  <span className="info-label">Instructor:</span>
-                  <span className="teacher-name">{course.instructor}</span>
-                </div>
-
-                <div className="course-dates">
-                  <div className="date-item">
-                    <span className="info-label">Start:</span>
-                    <span className="date-val">{course.startDate}</span>
-                  </div>
-                  <div className="date-item">
-                    <span className="info-label">End:</span>
-                    <span className="date-val">{course.endDate}</span>
-                  </div>
-                </div>
-
-                {/* Edit & Delete Actions */}
-                <div className="course-card-actions">
-                  <button
-                    className="card-action-btn edit-btn"
-                    onClick={() => handleOpenEditModal(course)}
-                  >
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                    <span>Edit</span>
-                  </button>
-                  <button
-                    className="card-action-btn delete-btn"
-                    onClick={() => handleDeleteCourse(course.id)}
-                  >
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                    <span>Delete</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="no-courses-view">
-            <p>No courses found matching your criteria.</p>
-          </div>
-        )}
-      </div>
-
-      {/* Add / Edit Course Modal */}
-      {isModalOpen && (
-        <div className="modal-backdrop">
-          <div className="modal-card">
-            <div className="modal-header">
-              <h3 className="modal-title">
-                {editingCourseId ? 'Edit Course' : 'Add New Course'}
-              </h3>
-              <button
-                className="modal-close-btn"
-                onClick={() => setIsModalOpen(false)}
+            return (
+              <div
+                key={courseId}
+                style={{
+                  backgroundColor: '#fff',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05)',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  border: '1px solid #e2e8f0',
+                  transition: 'transform 0.2s',
+                }}
               >
-                ✕
+                {/* Image & Status Tag */}
+                <div style={{ position: 'relative', height: '170px', width: '100%', backgroundColor: '#e2e8f0' }}>
+                  <img
+                    src={course.courseImageUrl || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=60'}
+                    alt={course.courseName}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      left: '12px',
+                      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                      color: '#fff',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    {course.courseCode}
+                  </span>
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      backgroundColor: statusStyle.bg,
+                      color: statusStyle.text,
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      padding: '4px 10px',
+                      borderRadius: '20px'
+                    }}
+                  >
+                    {course.status || 'Active'}
+                  </span>
+                </div>
+
+                {/* Card Content Body */}
+                <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#0f172a', margin: '0 0 10px 0', minHeight: '44px' }}>
+                    {course.courseName}
+                  </h3>
+
+                  {/* Instructor / Teacher Info */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.88rem', color: '#475569', marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FaUserTie color="#2563eb" />
+                      <span><strong>Instructor:</strong> {course.instructorName || 'N/A'}</span>
+                    </div>
+                    {course.teacherName && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <FaGraduationCap color="#10b981" />
+                        <span><strong>Teacher:</strong> {course.teacherName} {course.qualification ? `(${course.qualification})` : ''}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Course Timeline */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '6px', fontSize: '0.82rem', color: '#64748b', marginBottom: '16px' }}>
+                    <div>
+                      <span style={{ display: 'block', fontWeight: 600, color: '#334155' }}>Start</span>
+                      {course.startingDate ? new Date(course.startingDate).toLocaleDateString() : 'N/A'}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ display: 'block', fontWeight: 600, color: '#334155' }}>End</span>
+                      {course.endingDate ? new Date(course.endingDate).toLocaleDateString() : 'N/A'}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons: View, Edit, Delete */}
+                  <div style={{ marginTop: 'auto', display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenView(course)}
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '7px 0', backgroundColor: '#eff6ff', color: '#1d4ed8', border: 'none', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <FaEye /> View
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(course)}
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '7px 0', backgroundColor: '#fef3c7', color: '#b45309', border: 'none', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <FaEdit /> Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCourse(courseId)}
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '7px 0', backgroundColor: '#fee2e2', color: '#b91c1c', border: 'none', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <FaTrash /> Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div style={{ textAlign: 'center', padding: '60px 20px', backgroundColor: '#fff', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
+          <p style={{ color: '#64748b', fontSize: '1rem', margin: 0 }}>No course records found matching your filters.</p>
+        </div>
+      )}
+
+      {/* 1. Add / Edit Modal */}
+      {isFormModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid #e2e8f0' }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#0f172a' }}>
+                {editingCourseId ? 'Edit Course Details' : 'Add New Course'}
+              </h3>
+              <button type="button" onClick={() => setIsFormModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                <FaTimes size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveCourse} className="modal-form">
-              <div className="form-group">
-                <label>Course Name</label>
+            <form onSubmit={handleSaveCourse} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Course Name *</label>
                 <input
                   type="text"
-                  name="name"
+                  name="courseName"
                   required
                   placeholder="e.g. Advanced Machine Learning"
-                  value={formData.name}
+                  value={formData.courseName}
                   onChange={handleInputChange}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                 />
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Course Code</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Course Code *</label>
                   <input
                     type="text"
-                    name="code"
+                    name="courseCode"
                     required
                     placeholder="e.g. CS-ML401"
-                    value={formData.code}
+                    value={formData.courseCode}
                     onChange={handleInputChange}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                   />
                 </div>
-                <div className="form-group">
-                  <label>Instructor Name</label>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Instructor Name *</label>
                   <input
                     type="text"
-                    name="instructor"
+                    name="instructorName"
                     required
                     placeholder="e.g. Prof. David Miller"
-                    value={formData.instructor}
+                    value={formData.instructorName}
                     onChange={handleInputChange}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                   />
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Starting Date</label>
+              {/* Teacher & Qualification */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Teacher Name</label>
                   <input
-                    type="date"
-                    name="startDate"
-                    required
-                    value={formData.startDate}
+                    type="text"
+                    name="teacherName"
+                    placeholder="e.g. Dr. Rajesh Sharma"
+                    value={formData.teacherName}
                     onChange={handleInputChange}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                   />
                 </div>
-                <div className="form-group">
-                  <label>Ending Date</label>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Qualification</label>
                   <input
-                    type="date"
-                    name="endDate"
-                    required
-                    value={formData.endDate}
+                    type="text"
+                    name="qualification"
+                    placeholder="e.g. M.Tech, Ph.D in AI"
+                    value={formData.qualification}
                     onChange={handleInputChange}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                   />
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Status</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Starting Date *</label>
+                  <input
+                    type="date"
+                    name="startingDate"
+                    required
+                    value={formData.startingDate}
+                    onChange={handleInputChange}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Ending Date *</label>
+                  <input
+                    type="date"
+                    name="endingDate"
+                    required
+                    value={formData.endingDate}
+                    onChange={handleInputChange}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Status</label>
                   <select
                     name="status"
                     value={formData.status}
                     onChange={handleInputChange}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
+                    <option value="Upcoming">Upcoming</option>
+                    <option value="Completed">Completed</option>
                   </select>
                 </div>
-                <div className="form-group">
-                  <label>Course Image URL</label>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Course Image URL</label>
                   <input
                     type="url"
-                    name="image"
+                    name="courseImageUrl"
                     placeholder="Paste image web link (optional)"
-                    value={formData.image}
+                    value={formData.courseImageUrl}
                     onChange={handleInputChange}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                   />
                 </div>
               </div>
 
-              <div className="modal-actions">
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
                 <button
                   type="button"
-                  className="btn-secondary"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => setIsFormModalOpen(false)}
+                  style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary">
-                  {editingCourseId ? 'Update Course' : 'Save Course'}
+                <button
+                  type="submit"
+                  style={{ padding: '8px 18px', borderRadius: '6px', border: 'none', backgroundColor: '#2563eb', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {editingCourseId ? 'Save Changes' : 'Save Course'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2. View Course Details Modal */}
+      {viewModalOpen && selectedCourse && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '520px', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ position: 'relative', height: '180px', width: '100%' }}>
+              <img
+                src={selectedCourse.courseImageUrl || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=60'}
+                alt={selectedCourse.courseName}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              <button
+                type="button"
+                onClick={() => setViewModalOpen(false)}
+                style={{ position: 'absolute', top: '12px', right: '12px', backgroundColor: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, backgroundColor: '#e2e8f0', color: '#334155', padding: '3px 8px', borderRadius: '4px' }}>
+                  {selectedCourse.courseCode}
+                </span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: selectedCourse.status === 'Active' ? '#15803d' : '#b91c1c' }}>
+                  ● {selectedCourse.status}
+                </span>
+              </div>
+
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 700, color: '#0f172a', margin: '0 0 16px 0' }}>
+                {selectedCourse.courseName}
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid #f1f5f9', paddingTop: '16px', fontSize: '0.9rem' }}>
+                <div><strong>Lead Instructor:</strong> {selectedCourse.instructorName}</div>
+                <div><strong>Assigned Teacher:</strong> {selectedCourse.teacherName || 'Not Assigned'}</div>
+                <div><strong>Qualification:</strong> {selectedCourse.qualification || 'Not Specified'}</div>
+                <div>
+                  <strong>Schedule:</strong> {selectedCourse.startingDate ? new Date(selectedCourse.startingDate).toLocaleDateString() : 'N/A'} - {selectedCourse.endingDate ? new Date(selectedCourse.endingDate).toLocaleDateString() : 'N/A'}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+                <button
+                  type="button"
+                  onClick={() => setViewModalOpen(false)}
+                  style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', backgroundColor: '#0f172a', color: '#fff', cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

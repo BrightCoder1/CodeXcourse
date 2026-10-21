@@ -29,11 +29,14 @@ const Icons = {
     ),
 };
 
+
 export default function TopNavbar() {
     const [searchValue, setSearchValue] = useState('');
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const navigate = useNavigate();
     const { user, logout } = useAuth();
+    console.log('TopNavbar user:', user); // Debugging line to check the user object
+    const displayName = user?.emp_name?.trim() || user?.name?.trim() || user?.email || 'Admin';
 
     const handleLogout = async (e) => {
         e.preventDefault();
@@ -88,7 +91,7 @@ export default function TopNavbar() {
                             className="profile-avatar"
                         />
                         <span className="profile-name">
-                            {user?.emp_name || 'Admin'}
+                            {displayName.toUpperCase()}
                         </span>
                         <Icons.ChevronDown />
                     </button>

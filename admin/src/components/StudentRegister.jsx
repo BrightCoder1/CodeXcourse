@@ -1,96 +1,242 @@
 import React, { useState } from 'react';
+import axios from 'axios';
+import { useLocation, useNavigate } from 'react-router-dom';
 import './StudentRegister.css';
-import { 
-  FaArrowLeft, FaSave, FaUser, FaIdCard, FaAddressBook, 
-  FaUsers, FaGraduationCap, FaUniversity, FaRupeeSign 
+import {
+  FaArrowLeft, FaSave, FaUser, FaIdCard, FaAddressBook,
+  FaUsers, FaGraduationCap, FaUniversity, FaRupeeSign
 } from 'react-icons/fa';
 
-const StudentRegister = () => {
-  const [formData, setFormData] = useState({
-    student_name: '',
-    middle_name: '',
-    last_name: '',
-    date_of_birth: '',
-    gender: 'Male',
-    blood_group: '',
-    nationality: 'Indian',
-    category: 'General',
+const initialFormData = {
+  student_name: '',
+  middle_name: '',
+  last_name: '',
+  date_of_birth: '',
+  gender: 'Male',
+  blood_group: '',
+  nationality: 'Indian',
+  category: 'General',
 
-    // Identity Details
-    aadhar_card_number: '',
-    pan_card_number: '',
+  // Identity Details
+  aadhar_card_number: '',
+  pan_card_number: '',
 
-    // Contact Details
-    email: '',
-    phone_number: '',
-    alternate_phone: '',
-    address: '',
-    city: '',
-    state: '',
-    pin_code: '',
-    country: 'India',
+  // Contact Details
+  email: '',
+  phone_number: '',
+  alternate_phone: '',
+  address: '',
+  city: '',
+  state: '',
+  pin_code: '',
+  country: 'India',
 
-    // Parent / Guardian Details
-    father_name: '',
-    mother_name: '',
-    guardian_name: '',
-    parent_phone: '',
-    parent_email: '',
-    parent_occupation: '',
-    annual_family_income: '',
+  // Parent / Guardian Details
+  father_name: '',
+  mother_name: '',
+  guardian_name: '',
+  parent_phone: '',
+  parent_email: '',
+  parent_occupation: '',
+  annual_family_income: '',
 
-    // Academic Details
-    qualification: '',
-    tenth_board: '',
-    tenth_passing_year: '',
-    tenth_percentage: '',
-    twelfth_board: '',
-    twelfth_passing_year: '',
-    twelfth_percentage: '',
-    previous_college: '',
-    previous_course: '',
-    graduation_percentage: '',
-    entrance_exam_name: '',
-    entrance_exam_score: '',
+  // Academic Details
+  qualification: '',
+  tenth_board: '',
+  tenth_passing_year: '',
+  tenth_percentage: '',
+  twelfth_board: '',
+  twelfth_passing_year: '',
+  twelfth_percentage: '',
+  previous_college: '',
+  previous_course: '',
+  graduation_percentage: '',
+  entrance_exam_name: '',
+  entrance_exam_score: '',
 
-    // Admission Details
-    application_number: '',
-    admission_number: '',
-    admission_date: new Date().toISOString().split('T')[0],
-    academic_session: '',
-    department: '',
-    course: '',
-    specialization: '',
-    semester: 1,
-    admission_type: 'Regular',
-    admission_status: 'Pending',
-    roll_number: '',
+  // Admission Details
+  application_number: '',
+  admission_number: '',
+  admission_date: new Date().toISOString().split('T')[0],
+  academic_session: '',
+  department: '',
+  course: '',
+  specialization: '',
+  semester: 1,
+  admission_type: 'Regular',
+  admission_status: 'Pending',
+  roll_number: '',
 
-    // Fee Details
-    total_fee: '',
-    admission_fee: '',
-    tuition_fee: '',
-    scholarship_amount: '',
-    paid_amount: '',
-    pending_amount: '',
-    payment_status: 'Pending',
-    payment_method: 'Other',
-    transaction_id: '',
-    last_payment_date: '',
+  // Fee Details
+  total_fee: '',
+  admission_fee: '',
+  tuition_fee: '',
+  scholarship_amount: '',
+  paid_amount: '',
+  pending_amount: '',
+  payment_status: 'Pending',
+  payment_method: 'Other',
+  transaction_id: '',
+  last_payment_date: '',
 
-    // Remarks
-    remarks: ''
+  // Remarks
+  remarks: ''
+};
+
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
+
+const formatDateForInput = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+};
+
+const getStudentFormData = (student) => {
+  if (!student) return initialFormData;
+
+  const studentFormData = { ...initialFormData };
+  Object.keys(initialFormData).forEach((field) => {
+    if (student[field] !== undefined && student[field] !== null) {
+      studentFormData[field] = ['date_of_birth', 'admission_date', 'last_payment_date'].includes(field)
+        ? formatDateForInput(student[field])
+        : student[field];
+    }
   });
+  return studentFormData;
+};
+
+const StudentRegister = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const student = location.state?.student;
+  const studentId = student?._id || student?.id;
+  const isEditing = Boolean(studentId);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [formData, setFormData] = useState(() => getStudentFormData(student));
+
+  const handleCancelOrClear = () => {
+    if (isEditing) {
+      navigate('/students');
+      return;
+    }
+    setFormData(initialFormData);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+
+      if (name === 'total_fee' || name === 'paid_amount') {
+        const total = parseFloat(name === 'total_fee' ? value : updated.total_fee) || 0;
+        const paid = parseFloat(name === 'paid_amount' ? value : updated.paid_amount) || 0;
+        updated.pending_amount = Math.max(0, total - paid);
+
+        if (paid === 0) {
+          updated.payment_status = 'Pending';
+        } else if (paid >= total && total > 0) {
+          updated.payment_status = 'Paid';
+        } else {
+          updated.payment_status = 'Partial';
+        }
+      }
+
+      return updated;
+    });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Submitted Student Data:", formData);
-    alert("Student profile registered successfully!");
+    setLoading(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    const token =
+      localStorage.getItem('admin_token') ||
+      localStorage.getItem('token') ||
+      localStorage.getItem('adminToken') ||
+      getCookie('token');
+
+    const payload = { ...formData };
+    const numericFields = [
+      'annual_family_income',
+      'tenth_passing_year',
+      'tenth_percentage',
+      'twelfth_passing_year',
+      'twelfth_percentage',
+      'graduation_percentage',
+      'entrance_exam_score',
+      'semester',
+      'total_fee',
+      'admission_fee',
+      'tuition_fee',
+      'scholarship_amount',
+      'paid_amount',
+      'pending_amount'
+    ];
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] === null) {
+        delete payload[key];
+      } else if (payload[key] === '') {
+        if (isEditing && numericFields.includes(key)) {
+          payload[key] = null;
+        } else if (isEditing && ['date_of_birth', 'admission_date', 'last_payment_date'].includes(key)) {
+          payload[key] = null;
+        } else if (!isEditing) {
+          delete payload[key];
+        }
+      }
+    });
+
+    // Request headers setup
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await axios({
+        method: isEditing ? 'put' : 'post',
+        url: isEditing
+          ? `http://localhost:4000/api/student/${studentId}`
+          : 'http://localhost:4000/api/register/student',
+        data: payload,
+        headers,
+        withCredentials: true
+      });
+
+      const message = response.data?.message ||
+        (isEditing ? 'Student updated successfully!' : 'Student registered successfully!');
+      setSuccessMessage(message);
+      alert(message);
+      if (isEditing) {
+        navigate('/students');
+      } else {
+        setFormData(initialFormData);
+      }
+
+    } catch (err) {
+      console.error('Registration Error:', err);
+      const errorMsg =
+        err.response?.data?.message ||
+        err.message ||
+        'Server error occurred during student registration.';
+      setErrorMessage(errorMsg);
+      alert(errorMsg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -98,26 +244,43 @@ const StudentRegister = () => {
       {/* Top Header Bar */}
       <header className="register-header">
         <div className="header-title-wrapper">
-          <button className="back-btn" onClick={() => window.history.back()}>
+          <button type="button" className="back-btn" onClick={() => navigate('/students')}>
             <FaArrowLeft />
           </button>
           <div>
-            <h1>Add New Student</h1>
-            <p>Enter the complete details of the student to register their academic profile.</p>
+            <h1>{isEditing ? 'Edit Student' : 'Add New Student'}</h1>
+            <p>{isEditing ? "Update the student's academic profile and information." : 'Enter the complete details of the student to register their academic profile.'}</p>
           </div>
         </div>
-        {/* <div className="header-actions">
-          <button type="button" className="btn-cancel" onClick={() => window.location.reload()}>Cancel</button>
-          <button type="submit" form="studentForm" className="btn-save">
-            <FaSave /> Save Student
+        <div className="header-actions">
+          <button
+            type="button"
+            className="btn-cancel"
+            onClick={handleCancelOrClear}
+          >
+            {isEditing ? 'Cancel' : 'Clear Form'}
           </button>
-        </div> */}
-        
+          <button type="submit" form="studentForm" className="btn-save" disabled={loading}>
+            <FaSave /> {loading ? 'Saving...' : isEditing ? 'Update Student' : 'Save Student'}
+          </button>
+        </div>
       </header>
+
+      {/* Messages */}
+      {errorMessage && (
+        <div className="alert-error" style={{ color: '#dc2626', backgroundColor: '#fee2e2', padding: '12px 16px', borderRadius: '8px', margin: '16px 0', border: '1px solid #f87171' }}>
+          {errorMessage}
+        </div>
+      )}
+      {successMessage && (
+        <div className="alert-success" style={{ color: '#16a34a', backgroundColor: '#dcfce7', padding: '12px 16px', borderRadius: '8px', margin: '16px 0', border: '1px solid #86efac' }}>
+          {successMessage}
+        </div>
+      )}
 
       {/* Form Content */}
       <form id="studentForm" onSubmit={handleSubmit} className="register-form">
-        
+
         {/* SECTION 1: Basic & Personal Details */}
         <div className="form-card">
           <div className="card-header">
@@ -210,15 +373,15 @@ const StudentRegister = () => {
           <div className="form-grid">
             <div className="form-group">
               <label>Email Address <span className="required">*</span></label>
-              <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="student@gmail.com" required />
+              <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="student@example.com" required />
             </div>
             <div className="form-group">
               <label>Phone Number <span className="required">*</span></label>
-              <input type="text" name="phone_number" value={formData.phone_number} onChange={handleChange} placeholder="10-digit mobile number" maxLength="10" required />
+              <input type="tel" name="phone_number" value={formData.phone_number} onChange={handleChange} placeholder="10-digit mobile number" maxLength="10" required />
             </div>
             <div className="form-group">
               <label>Alternate Phone</label>
-              <input type="text" name="alternate_phone" value={formData.alternate_phone} onChange={handleChange} placeholder="Alternate contact number" maxLength="10" />
+              <input type="tel" name="alternate_phone" value={formData.alternate_phone} onChange={handleChange} placeholder="Alternate contact number" maxLength="10" />
             </div>
             <div className="form-group full-width">
               <label>Street Address <span className="required">*</span></label>
@@ -268,11 +431,11 @@ const StudentRegister = () => {
             </div>
             <div className="form-group">
               <label>Parent Phone Number <span className="required">*</span></label>
-              <input type="text" name="parent_phone" value={formData.parent_phone} onChange={handleChange} placeholder="10-digit mobile number" maxLength="10" required />
+              <input type="tel" name="parent_phone" value={formData.parent_phone} onChange={handleChange} placeholder="10-digit mobile number" maxLength="10" required />
             </div>
             <div className="form-group">
               <label>Parent Email</label>
-              <input type="email" name="parent_email" value={formData.parent_email} onChange={handleChange} placeholder="parent@gmail.com" />
+              <input type="email" name="parent_email" value={formData.parent_email} onChange={handleChange} placeholder="parent@example.com" />
             </div>
             <div className="form-group">
               <label>Parent Occupation</label>
@@ -300,7 +463,7 @@ const StudentRegister = () => {
               <label>Current Qualification <span className="required">*</span></label>
               <input type="text" name="qualification" value={formData.qualification} onChange={handleChange} placeholder="e.g. 12th Pass, Graduate" required />
             </div>
-            
+
             {/* 10th Details */}
             <div className="form-group">
               <label>10th Board</label>
@@ -329,7 +492,7 @@ const StudentRegister = () => {
               <input type="number" step="0.01" name="twelfth_percentage" value={formData.twelfth_percentage} onChange={handleChange} placeholder="e.g. 88.0" min="0" max="100" />
             </div>
 
-            {/* Graduation / College Details */}
+            {/* Graduation Details */}
             <div className="form-group">
               <label>Previous College</label>
               <input type="text" name="previous_college" value={formData.previous_college} onChange={handleChange} placeholder="Name of previous institution" />
@@ -388,7 +551,7 @@ const StudentRegister = () => {
             </div>
             <div className="form-group">
               <label>Course <span className="required">*</span></label>
-              <input type="text" name="course" value={formData.course} onChange={handleChange} placeholder="e.g. B.Tech MERN Stack" required />
+              <input type="text" name="course" value={formData.course} onChange={handleChange} placeholder="e.g. B.Tech Computer Science" required />
             </div>
             <div className="form-group">
               <label>Specialization</label>
@@ -453,7 +616,7 @@ const StudentRegister = () => {
             </div>
             <div className="form-group">
               <label>Pending Amount (₹)</label>
-              <input type="number" name="pending_amount" value={formData.pending_amount} onChange={handleChange} placeholder="0" min="0" />
+              <input type="number" name="pending_amount" value={formData.pending_amount} onChange={handleChange} placeholder="0" min="0" readOnly />
             </div>
             <div className="form-group">
               <label>Payment Status</label>
@@ -490,9 +653,9 @@ const StudentRegister = () => {
 
         {/* Bottom Actions Footer */}
         <div className="form-footer-actions">
-          <button type="button" className="btn-cancel" onClick={() => window.location.reload()}>Cancel</button>
-          <button type="submit" className="btn-save">
-            <FaSave /> Save Student
+          <button type="button" className="btn-cancel" onClick={handleCancelOrClear}>{isEditing ? 'Cancel' : 'Clear Form'}</button>
+          <button type="submit" className="btn-save" disabled={loading}>
+            <FaSave /> {loading ? 'Saving...' : isEditing ? 'Update Student' : 'Save Student'}
           </button>
         </div>
 

@@ -82,7 +82,6 @@ function AppRoutes() {
           <Route path="/student/register" element={<StudentRegister />} />
 
 
-
           <Route path="/employees" element={<Employee />} />
           <Route path="/employees/add" element={<EmployeeAdd />} />
           <Route path="/employees/edit/:id" element={<EmployeeEdit />} />

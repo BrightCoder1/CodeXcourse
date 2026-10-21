@@ -408,7 +408,7 @@ const getlogout = async (req, res) => {
 
 const updateProfile = async (req, res) => {
     try {
-        const { username, email, phone, address } = req.body;
+        const { emp_name, email, contact_number, address } = req.body;
 
         const user = await User.findById(req.user._id);
 
@@ -419,28 +419,27 @@ const updateProfile = async (req, res) => {
             });
         }
 
-        if (username !== undefined) {
-            user.username = username;
+        if (emp_name !== undefined) {
+            user.emp_name = emp_name;
         }
 
-        if (email !== undefined && email !== user.email) {
-            const existingUser = await User.findOne({ email });
+        if (email !== undefined) {
+            const normalizedEmail = email.trim().toLowerCase();
 
-            if (
-                existingUser &&
-                existingUser._id.toString() !== user._id.toString()
-            ) {
-                return res.status(409).json({
-                    success: false,
-                    message: "Email is already registered."
-                });
+            if (normalizedEmail !== user.email) {
+                const existingUser = await User.findOne({ email: normalizedEmail });
+                if (existingUser) {
+                    return res.status(409).json({
+                        success: false,
+                        message: "Email is already registered."
+                    });
+                }
+                user.email = normalizedEmail;
             }
-
-            user.email = email;
         }
 
-        if (phone !== undefined) {
-            user.phone = phone;
+        if (contact_number !== undefined) {
+            user.contact_number = contact_number;
         }
 
         if (address !== undefined) {
@@ -459,6 +458,13 @@ const updateProfile = async (req, res) => {
         });
 
     } catch (error) {
+        if (error.name === "ValidationError") {
+            return res.status(400).json({
+                success: false,
+                message: Object.values(error.errors).map((err) => err.message).join(", ")
+            });
+        }
+
         return res.status(500).json({
             success: false,
             message: error.message
