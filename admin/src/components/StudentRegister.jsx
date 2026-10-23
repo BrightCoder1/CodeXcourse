@@ -155,6 +155,16 @@ const StudentRegister = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isEditing) {
+      const studentName = [formData.student_name, formData.middle_name, formData.last_name]
+        .filter(Boolean)
+        .join(' ');
+      const confirmed = window.confirm(
+        `Save the updated details${studentName ? ` for ${studentName}` : ''}?`
+      );
+      if (!confirmed) return;
+    }
+
     setLoading(true);
     setErrorMessage('');
     setSuccessMessage('');

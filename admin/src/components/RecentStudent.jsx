@@ -1,170 +1,170 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from "react";
+import authService from "../services/authServices";
 
-const initialEnrollments = Array.from({ length: 100 }, (_, index) => {
-  const isEven = index % 2 === 0;
-  return {
-    id: index + 1,
-    name: isEven ? 'Aria Chen' : 'Leo Novak',
-    avatar: isEven
-      ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face'
-      : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face',
-    course: isEven ? 'Intro to Python' : 'React basics',
-    date: isEven ? 'Apr 25, 2023' : 'Sep 18, 2023',
-    status: isEven ? 'Active' : 'Pending',
-  };
-});
+const formatDate = (value) => {
+  if (!value) return "Not provided";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Not provided" : date.toLocaleDateString();
+};
+
+const formatLabel = (key) =>
+  key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/_/g, " ")
+    .replace(/^./, (letter) => letter.toUpperCase());
+
+const formatValue = (key, value) => {
+  if (value === null || value === undefined || value === "") return "Not provided";
+  if (key === "date_of_birth" || key === "admission_date" || key === "last_payment_date" || key === "createdAt" || key === "updatedAt") {
+    return formatDate(value);
+  }
+  return String(value);
+};
 
 const RecentStudent = () => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [filter, setFilter] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
-  // Search aur Dropdown Filter logic
-  const filteredList = initialEnrollments.filter((item) => {
-    // Dropdown Status filter
-    const matchesStatus =
-      filter === 'All' || item.status.toLowerCase() === filter.toLowerCase();
+  useEffect(() => {
+    let active = true;
 
-    // Search query matches any detail: Name, Course, Date, or Status
+    authService.getRecentStudents()
+      .then((recentStudents) => {
+        if (active) setStudents(recentStudents);
+      })
+      .catch((fetchError) => {
+        if (active) {
+          setError(
+            fetchError.response?.data?.message ||
+              fetchError.message ||
+              "Failed to load recent student registrations."
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filteredStudents = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    const matchesSearch =
-      query === '' ||
-      item.name.toLowerCase().includes(query) ||
-      item.course.toLowerCase().includes(query) ||
-      item.date.toLowerCase().includes(query) ||
-      item.status.toLowerCase().includes(query);
+    if (!query) return students;
 
-    return matchesStatus && matchesSearch;
-  });
+    return students.filter((student) =>
+      [
+        student.student_name,
+        student.middle_name,
+        student.last_name,
+        student.email,
+        student.course,
+        student.roll_number,
+        student.application_number,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    );
+  }, [searchQuery, students]);
 
-  const getCurrentPageSize = (page) => (page === 1 ? 10 : 40);
+  const studentName = (student) =>
+    [student.student_name, student.middle_name, student.last_name]
+      .filter(Boolean)
+      .join(" ");
 
-  const startIndex = currentPage === 1 ? 0 : 10 + (currentPage - 2) * 40;
-  const currentLimit = getCurrentPageSize(currentPage);
-  const endIndex = startIndex + currentLimit;
+  const studentId = (student) =>
+    student.roll_number || student.application_number || "Not provided";
 
-  const displayedStudents = filteredList.slice(startIndex, endIndex);
-
-  const remainingCount = Math.max(0, filteredList.length - 10);
-  const totalPages =
-    filteredList.length === 0 ? 1 : 1 + Math.ceil(remainingCount / 40);
-
-  const handleNext = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage((prev) => prev + 1);
-    }
-  };
-
-  const handlePrev = () => {
-    if (currentPage > 1) {
-      setCurrentPage((prev) => prev - 1);
-    }
-  };
-
-  const handleSearchChange = (e) => {
-    setSearchQuery(e.target.value);
-    setCurrentPage(1); // Search karte waqt wapas 1st page par le aayega
-  };
+  const profileDetails = selectedStudent
+    ? Object.entries(selectedStudent).filter(
+        ([key]) => !["_id", "__v"].includes(key)
+      )
+    : [];
 
   return (
     <div className="recent-students-card">
-      {/* Header Section: Title, Search Bar & Status Filter */}
       <div className="recent-header">
-        <h3 className="recent-title">Recent Student Enrollments</h3>
-
+        <div>
+          <h3 className="recent-title">Recent Student Registrations</h3>
+          <p className="recent-subtitle">Students registered in the last 3 days (latest 10)</p>
+        </div>
         <div className="header-actions">
-          {/* Search Input Box */}
-          <div className="search-box">
-            <svg
-              className="search-icon"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+          <form
+            className="recent-search-form"
+            role="search"
+            onSubmit={(event) => event.preventDefault()}
+          >
             <input
               type="text"
-              placeholder="Search by student, course, date..."
+              placeholder="Search recent students..."
+              aria-label="Search recent students"
               value={searchQuery}
-              onChange={handleSearchChange}
+              onChange={(event) => setSearchQuery(event.target.value)}
               className="search-input"
             />
-            {searchQuery && (
-              <button
-                type="button"
-                className="clear-search-btn"
-                onClick={() => {
-                  setSearchQuery('');
-                  setCurrentPage(1);
-                }}
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* Status Dropdown */}
-          <div className="filter-dropdown">
-            <select
-              value={filter}
-              onChange={(e) => {
-                setFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="All">All frequent</option>
-              <option value="Active">Active only</option>
-              <option value="Pending">Pending only</option>
-            </select>
-          </div>
+            <button type="submit" className="recent-search-button">
+              Search
+            </button>
+          </form>
         </div>
       </div>
 
-      {/* Table Content */}
       <div className="table-responsive">
         <table className="students-table">
           <thead>
             <tr>
               <th>Student</th>
-              <th>Course name</th>
-              <th>Date</th>
+              <th>Student ID</th>
+              <th>Course</th>
+              <th>Registered</th>
               <th>Status</th>
+              <th>Profile</th>
             </tr>
           </thead>
           <tbody>
-            {displayedStudents.length > 0 ? (
-              displayedStudents.map((item) => (
-                <tr key={item.id}>
+            {loading ? (
+              <tr><td colSpan="6" className="no-data-cell">Loading recent registrations...</td></tr>
+            ) : error ? (
+              <tr><td colSpan="6" className="no-data-cell" role="alert">{error}</td></tr>
+            ) : filteredStudents.length ? (
+              filteredStudents.map((student) => (
+                <tr key={student._id}>
                   <td className="student-info-cell">
-                    <img
-                      src={item.avatar}
-                      alt={item.name}
-                      className="student-avatar"
-                    />
-                    <span className="student-name">{item.name}</span>
-                  </td>
-                  <td className="course-cell">{item.course}</td>
-                  <td className="date-cell">{item.date}</td>
-                  <td className="status-cell">
-                    <span
-                      className={`status-badge ${item.status.toLowerCase()}`}
-                    >
-                      {item.status}
+                    <span className="student-avatar recent-student-initial" aria-hidden="true">
+                      {studentName(student).charAt(0).toUpperCase()}
                     </span>
+                    <span className="student-name">{studentName(student)}</span>
+                  </td>
+                  <td>{studentId(student)}</td>
+                  <td className="course-cell">{student.course || "Not provided"}</td>
+                  <td className="date-cell">{formatDate(student.createdAt)}</td>
+                  <td className="status-cell">
+                    <span className={`status-badge ${(student.admission_status || "Pending").toLowerCase()}`}>
+                      {student.admission_status || "Pending"}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="recent-profile-button"
+                      onClick={() => setSelectedStudent(student)}
+                    >
+                      Profile
+                    </button>
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="4" className="no-data-cell">
-                  No records found matching "{searchQuery}"
+                <td colSpan="6" className="no-data-cell">
+                  {searchQuery
+                    ? "No recent students match your search."
+                    : "No students registered in the last 3 days."}
                 </td>
               </tr>
             )}
@@ -172,36 +172,44 @@ const RecentStudent = () => {
         </table>
       </div>
 
-      {/* Dynamic Pagination Controls */}
-      <div className="pagination-wrapper">
-        <span className="pagination-info">
-          Showing <strong>{filteredList.length === 0 ? 0 : startIndex + 1}</strong> to{' '}
-          <strong>{Math.min(endIndex, filteredList.length)}</strong> of{' '}
-          <strong>{filteredList.length}</strong>
-        </span>
-
-        <div className="pagination-buttons">
-          <button
-            className="pag-btn"
-            onClick={handlePrev}
-            disabled={currentPage === 1}
+      {selectedStudent && (
+        <div
+          className="recent-profile-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setSelectedStudent(null);
+          }}
+        >
+          <section
+            className="recent-profile-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="recent-profile-title"
           >
-            Prev
-          </button>
-
-          <span className="page-indicator">
-            Page {currentPage} of {totalPages}
-          </span>
-
-          <button
-            className="pag-btn"
-            onClick={handleNext}
-            disabled={currentPage >= totalPages}
-          >
-            Next ({currentPage === 1 ? '40 items' : '40 items'})
-          </button>
+            <header className="recent-profile-dialog-header">
+              <div>
+                <h3 id="recent-profile-title">Student Profile</h3>
+                <p>{studentName(selectedStudent)}</p>
+              </div>
+              <button
+                type="button"
+                className="recent-profile-close"
+                aria-label="Close student profile"
+                onClick={() => setSelectedStudent(null)}
+              >
+                ×
+              </button>
+            </header>
+            <dl className="recent-profile-details">
+              {profileDetails.map(([key, value]) => (
+                <div className="recent-profile-detail" key={key}>
+                  <dt>{formatLabel(key)}</dt>
+                  <dd>{formatValue(key, value)}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
         </div>
-      </div>
+      )}
     </div>
   );
 };

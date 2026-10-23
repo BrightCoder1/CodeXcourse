@@ -17,6 +17,8 @@ const adminAuth = require("./middleware/adminAuth.js");
 const {
   student_register,
   getAllStudents,
+  getStudentCount,
+  getRecentStudents,
   getStudentById,
   updateStudent,
   deleteStudent
@@ -47,6 +49,8 @@ router.delete("/delete", adminAuth, deleteProfile);
 // Student Routes
 router.post("/register/student", adminAuth, student_register);
 router.get('/student', adminAuth, getAllStudents);
+router.get('/student/count', adminAuth, getStudentCount);
+router.get('/student/recent', adminAuth, getRecentStudents);
 router.get('/student/:id', adminAuth, getStudentById);
 router.put('/student/:id', adminAuth, updateStudent);
 router.delete('/student/:id', adminAuth, deleteStudent);

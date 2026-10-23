@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import authService from '../services/authServices';
 
 const UsersIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -41,13 +42,36 @@ const ArrowRightIcon = () => (
 
 const DetailsOverview = () => {
   const navigate = useNavigate();
+  const [studentCount, setStudentCount] = useState(null);
+  const [studentCountError, setStudentCountError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    authService.getStudentCount()
+      .then((count) => {
+        if (active) setStudentCount(count);
+      })
+      .catch((error) => {
+        if (active) {
+          setStudentCountError(
+            error.response?.data?.message || error.message || 'Failed to load student count.'
+          );
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const cardsData = [
     {
       id: 1,
       title: 'Total Students',
-      value: '24,582',
-      badge: '+8% from last month',
+      value: studentCount === null ? '—' : studentCount.toLocaleString(),
+      badge: studentCountError ? 'Count unavailable' : 'Registered students',
+      error: studentCountError,
       path: '/students', // Table show on page
       actionLabel: 'View Directory',
       icon: <UsersIcon />
@@ -69,15 +93,6 @@ const DetailsOverview = () => {
       path: '/employees/add', // Employee add
       actionLabel: 'Add New Staff',
       icon: <BriefcaseIcon />
-    },
-    {
-      id: 4,
-      title: 'Analytics & Reports',
-      value: '78.4%',
-      badge: 'Performance',
-      path: '/analysis', // Show anal page
-      actionLabel: 'View Analysis',
-      icon: <PieChartIcon />
     }
   ];
 
@@ -164,6 +179,11 @@ const DetailsOverview = () => {
             <h2 style={{ margin: 0, fontSize: '1.65rem', fontWeight: 700, color: '#0f172a' }}>
               {card.value}
             </h2>
+            {card.error && (
+              <span role="alert" style={{ color: '#b91c1c', fontSize: '0.75rem' }}>
+                {card.error}
+              </span>
+            )}
             <div
               style={{
                 display: 'flex',

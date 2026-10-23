@@ -3,7 +3,6 @@ import DashboardHeader from '../components/DashboardHeader';
 import DetailsOverview from '../components/DetailsOverview';
 import StudentGrowth from '../components/StudentGrowth';
 import RecentStudent from '../components/RecentStudent';
-import Registration from '../components/Registration';
 
 const Dashboard = () => {
     return (
@@ -13,7 +12,7 @@ const Dashboard = () => {
             />
 
             <DetailsOverview />
-            <Registration />
+            {/* <Registration /> */}
             <StudentGrowth />
             <RecentStudent />
         </div>

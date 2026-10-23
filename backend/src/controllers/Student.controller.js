@@ -130,6 +130,44 @@ const getAllStudents = async (req, res) => {
     }
 };
 
+const getStudentCount = async (req, res) => {
+    try {
+        const count = await Student.countDocuments();
+        return res.status(200).json({
+            success: true,
+            count
+        });
+    } catch (error) {
+        console.error('Get Student Count Error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch student count.'
+        });
+    }
+};
+
+
+const getRecentStudents = async (req, res) => {
+    try {
+        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+        const students = await Student.find({ createdAt: { $gte: threeDaysAgo } })
+            .sort({ createdAt: -1 })
+            .limit(10);
+
+        return res.status(200).json({
+            success: true,
+            count: students.length,
+            data: students
+        });
+    } catch (error) {
+        console.error('Get Recent Students Error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch recent students.'
+        });
+    }
+};
+
 // 3. Get Single Student by ID
 const getStudentById = async (req, res) => {
     try {
@@ -155,33 +193,89 @@ const getStudentById = async (req, res) => {
 // 4. Update Student Details
 const updateStudent = async (req, res) => {
     try {
-        const duplicateConditions = [];
-        if (req.body.email) {
-            duplicateConditions.push({ email: req.body.email.toLowerCase() });
-        }
-        if (req.body.application_number) {
-            duplicateConditions.push({ application_number: req.body.application_number });
+        const student = await Student.findById(req.params.id);
+        if (!student) {
+            return res.status(404).json({
+                success: false,
+                message: 'Student not found.'
+            });
         }
 
-        if (duplicateConditions.length) {
+        const updateData = { ...req.body };
+        delete updateData._id;
+        delete updateData.id;
+        delete updateData.__v;
+        delete updateData.createdAt;
+        delete updateData.updatedAt;
+
+        const email = typeof updateData.email === 'string'
+            ? updateData.email.trim().toLowerCase()
+            : updateData.email;
+        const applicationNumber = typeof updateData.application_number === 'string'
+            ? updateData.application_number.trim()
+            : updateData.application_number;
+        const admissionNumber = typeof updateData.admission_number === 'string'
+            ? updateData.admission_number.trim()
+            : updateData.admission_number;
+
+        const uniqueFieldLabels = {
+            email: 'Email',
+            application_number: 'Application Number',
+            admission_number: 'Admission Number'
+        };
+        const uniqueConditions = [];
+        if (email) {
+            updateData.email = email;
+            if (email !== student.email) {
+                uniqueConditions.push({ field: 'email', value: email });
+            }
+        }
+        if (applicationNumber) {
+            updateData.application_number = applicationNumber;
+            if (applicationNumber !== student.application_number) {
+                uniqueConditions.push({
+                    field: 'application_number',
+                    value: applicationNumber
+                });
+            }
+        }
+        if (admissionNumber !== undefined) {
+            const currentAdmissionNumber = typeof student.admission_number === 'string'
+                ? student.admission_number.trim()
+                : '';
+            if (admissionNumber === currentAdmissionNumber) {
+                delete updateData.admission_number;
+            } else {
+                updateData.admission_number = admissionNumber;
+                if (admissionNumber) {
+                    uniqueConditions.push({
+                        field: 'admission_number',
+                        value: admissionNumber
+                    });
+                }
+            }
+        }
+
+        if (uniqueConditions.length) {
             const duplicateStudent = await Student.findOne({
-                _id: { $ne: req.params.id },
-                $or: duplicateConditions
+                _id: { $ne: student._id },
+                $or: uniqueConditions.map(({ field, value }) => ({ [field]: value }))
             });
             if (duplicateStudent) {
-                const field = duplicateStudent.email === req.body.email?.toLowerCase()
-                    ? 'Email'
-                    : 'Application Number';
+                const duplicate = uniqueConditions.find(
+                    ({ field, value }) => duplicateStudent[field] === value
+                );
+                const field = uniqueFieldLabels[duplicate?.field] || 'Student detail';
                 return res.status(409).json({
                     success: false,
-                    message: `${field} already exists. Please check the details.`
+                    message: `${field} already belongs to another student. Please use a different value.`
                 });
             }
         }
 
         const updatedStudent = await Student.findByIdAndUpdate(
-            req.params.id,
-            { $set: req.body },
+            student._id,
+            { $set: updateData },
             { new: true, runValidators: true }
         );
 
@@ -199,10 +293,29 @@ const updateStudent = async (req, res) => {
         });
     } catch (error) {
         if (error.code === 11000) {
-            const field = Object.keys(error.keyPattern || {})[0] || 'Student detail';
+            const duplicateField =
+                Object.keys(error.keyPattern || {})[0] ||
+                Object.keys(error.keyValue || {})[0] ||
+                Object.keys(error.errors || {})[0] ||
+                error.message?.match(/dup key:\s*\{\s*([^:,\s]+)\s*:/i)?.[1];
+            const field = duplicateField
+                ? duplicateField
+                    .replace(/_/g, ' ')
+                    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+                : null;
+
+            if (!field) {
+                console.error('Student update duplicate-key error did not identify a field:', {
+                    index: error.index,
+                    message: error.message
+                });
+            }
+
             return res.status(409).json({
                 success: false,
-                message: `${field} already exists. Please check the details.`
+                message: field
+                    ? `${field} already belongs to another student. Please use a different value.`
+                    : 'A unique value conflicts with another student record. Check the backend log for the conflicting index.'
             });
         }
         return res.status(500).json({
@@ -238,6 +351,8 @@ const deleteStudent = async (req, res) => {
 module.exports = {
     student_register,
     getAllStudents,
+    getStudentCount,
+    getRecentStudents,
     getStudentById,
     updateStudent,
     deleteStudent

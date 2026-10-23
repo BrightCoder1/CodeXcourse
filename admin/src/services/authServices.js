@@ -5,6 +5,27 @@ const API = axios.create({
   withCredentials: true,
 });
 
+const pendingGetRequests = new Map();
+
+const getOnce = (url) => {
+  const pendingRequest = pendingGetRequests.get(url);
+  if (pendingRequest) return pendingRequest;
+
+  const request = API.get(url).then(
+    (response) => {
+      pendingGetRequests.delete(url);
+      return response;
+    },
+    (error) => {
+      pendingGetRequests.delete(url);
+      throw error;
+    }
+  );
+
+  pendingGetRequests.set(url, request);
+  return request;
+};
+
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem("admin_token");
   if (token) {
@@ -38,7 +59,7 @@ const authService = {
       throw new Error("No token found");
     }
 
-    const response = await API.get("/profile");
+    const response = await getOnce("/profile");
     const user = response.data.user || response.data;
     if (user.emp_role !== "admin") {
       localStorage.removeItem("admin_token");
@@ -50,6 +71,30 @@ const authService = {
   updateProfile: async (profileData) => {
     const response = await API.put("/update", profileData);
     return response.data.user;
+  },
+
+  getStudentCount: async () => {
+    const response = await getOnce("/student/count");
+    if (!Number.isInteger(response.data.count)) {
+      throw new Error("The server returned an invalid student count.");
+    }
+    return response.data.count;
+  },
+
+  getAllStudents: async () => {
+    const response = await getOnce("/student");
+    if (!Array.isArray(response.data.data)) {
+      throw new Error("The server returned an invalid students response.");
+    }
+    return response.data.data;
+  },
+
+  getRecentStudents: async () => {
+    const response = await getOnce("/student/recent");
+    if (!Array.isArray(response.data.data)) {
+      throw new Error("The server returned an invalid recent-students response.");
+    }
+    return response.data.data;
   },
 
   logout: async () => {

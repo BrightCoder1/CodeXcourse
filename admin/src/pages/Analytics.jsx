@@ -1,83 +1,230 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import authService from '../services/authServices';
 
-const growthStats = [
-  {
-    id: 1,
-    title: 'Annual Revenue Run Rate',
-    value: '$542,800',
-    change: '+24.6%',
-    period: 'vs last year',
-    trend: 'up'
-  },
-  {
-    id: 2,
-    title: 'Platform Learners',
-    value: '48,250',
-    change: '+38.2%',
-    period: 'YoY Growth',
-    trend: 'up'
-  },
-  {
-    id: 3,
-    title: 'Course Completion & Retention',
-    value: '84.6%',
-    change: '+5.4%',
-    period: 'vs industry avg',
-    trend: 'up'
-  },
-  {
-    id: 4,
-    title: 'Net Profit Margin',
-    value: '31.8%',
-    change: '+3.1%',
-    period: 'Q3 performance',
-    trend: 'up'
-  }
-];
+const formatCurrency = (amount) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0
+  }).format(amount);
 
-const monthlyData = [
-  { month: 'Jan', revenue: 28, growth: 12 },
-  { month: 'Feb', revenue: 34, growth: 18 },
-  { month: 'Mar', revenue: 32, growth: 15 },
-  { month: 'Apr', revenue: 42, growth: 24 },
-  { month: 'May', revenue: 48, growth: 29 },
-  { month: 'Jun', revenue: 53, growth: 33 },
-  { month: 'Jul', revenue: 61, growth: 42 },
-  { month: 'Aug', revenue: 70, growth: 50 },
-  { month: 'Sep', revenue: 78, growth: 55 },
-  { month: 'Oct', revenue: 86, growth: 64 },
-  { month: 'Nov', revenue: 92, growth: 71 },
-  { month: 'Dec', revenue: 104, growth: 82 }
-];
+const escapeXml = (value) =>
+  String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+const createWorksheet = (name, rows) => `
+  <Worksheet ss:Name="${escapeXml(name)}">
+    <Table>
+      ${rows.map((row) => `<Row>${row.map((value) => {
+        const type = typeof value === 'number' && Number.isFinite(value) ? 'Number' : 'String';
+        return `<Cell><Data ss:Type="${type}">${escapeXml(value)}</Data></Cell>`;
+      }).join('')}</Row>`).join('')}
+    </Table>
+  </Worksheet>`;
+
+const getStudentAdmissionDate = (student) => {
+  const value = student.admission_date || student.createdAt;
+  if (!value) return null;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
 
 const Analytics = () => {
-  const [selectedYear, setSelectedYear] = useState('2024');
-  const [activeHover, setActiveHover] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [loadingStudents, setLoadingStudents] = useState(true);
+  const [studentsError, setStudentsError] = useState('');
+  const [selectedYear, setSelectedYear] = useState('all');
+  const [selectedMonth, setSelectedMonth] = useState('all');
+  const [selectedDay, setSelectedDay] = useState('all');
+  const [exportError, setExportError] = useState('');
 
-  const maxRevenue = 120; // Scale base ($k)
+  useEffect(() => {
+    let active = true;
+
+    authService.getAllStudents()
+      .then((allStudents) => {
+        if (active) setStudents(allStudents);
+      })
+      .catch((error) => {
+        if (active) {
+          setStudentsError(
+            error.response?.data?.message ||
+              error.message ||
+              'Failed to load student fee data.'
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingStudents(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const availableYears = useMemo(
+    () => Array.from(new Set(
+      students
+        .map(getStudentAdmissionDate)
+        .filter(Boolean)
+        .map((date) => date.getFullYear())
+    )).sort((left, right) => right - left),
+    [students]
+  );
+
+  const filteredStudents = useMemo(
+    () => students.filter((student) => {
+      if (selectedYear === 'all' && selectedMonth === 'all' && selectedDay === 'all') {
+        return true;
+      }
+
+      const date = getStudentAdmissionDate(student);
+      if (!date) return false;
+
+      return (
+        (selectedYear === 'all' || date.getFullYear() === Number(selectedYear)) &&
+        (selectedMonth === 'all' || date.getMonth() + 1 === Number(selectedMonth)) &&
+        (selectedDay === 'all' || date.getDate() === Number(selectedDay))
+      );
+    }),
+    [students, selectedYear, selectedMonth, selectedDay]
+  );
+
+  const feeData = useMemo(() => {
+    const courses = new Map();
+    let totalFees = 0;
+    let collected = 0;
+    let outstanding = 0;
+
+    filteredStudents.forEach((student) => {
+      const courseName = student.course?.trim() || 'Unspecified course';
+      const totalFee = Math.max(0, Number(student.total_fee) || 0);
+      const paidAmount = Math.max(0, Number(student.paid_amount) || 0);
+      const pendingAmount = Math.max(0, totalFee - paidAmount);
+      totalFees += totalFee;
+      collected += paidAmount;
+      outstanding += pendingAmount;
+      const courseFees = courses.get(courseName) || {
+        course: courseName,
+        totalFees: 0,
+        collected: 0,
+        outstanding: 0
+      };
+
+      courseFees.totalFees += totalFee;
+      courseFees.collected += paidAmount;
+      courseFees.outstanding += pendingAmount;
+      courses.set(courseName, courseFees);
+    });
+
+    return {
+      courses: Array.from(courses.values()).sort(
+        (left, right) =>
+          right.collected + right.outstanding - left.collected - left.outstanding
+      ),
+      totalFees,
+      collected,
+      outstanding
+    };
+  }, [filteredStudents]);
+
+  const maxFeeAmount = Math.max(
+    1,
+    ...feeData.courses.map((item) => Math.max(item.collected, item.outstanding))
+  );
+  const feeAxisTicks = Array.from({ length: 5 }, (_, index) =>
+    (maxFeeAmount * (4 - index)) / 4
+  );
+  const collectionRate = feeData.totalFees
+    ? Math.min(100, (feeData.collected / feeData.totalFees) * 100)
+    : 0;
+  const growthStats = [
+    { id: 1, title: 'Registered Students', value: filteredStudents.length.toLocaleString('en-IN'), period: 'Students in selected period' },
+    { id: 2, title: 'Total Fees', value: formatCurrency(feeData.totalFees), period: 'Expected from students' },
+    { id: 3, title: 'Fees Collected', value: formatCurrency(feeData.collected), period: 'Recorded payments' },
+    { id: 4, title: 'Outstanding Fees', value: formatCurrency(feeData.outstanding), period: 'Remaining balance' }
+  ];
+  const summaryValue = (value) =>
+    loadingStudents ? 'Loading...' : studentsError ? 'Unavailable' : value;
+
+  const handleExport = () => {
+    try {
+      setExportError('');
+      const monthLabel = selectedMonth === 'all'
+        ? 'All months'
+        : new Intl.DateTimeFormat('en', { month: 'long' }).format(
+          new Date(2024, Number(selectedMonth) - 1, 1)
+        );
+      const filterDescription = [
+        selectedYear === 'all' ? 'All years' : `Year ${selectedYear}`,
+        monthLabel,
+        selectedDay === 'all' ? 'All days' : `Day ${selectedDay}`
+      ].join(', ');
+      const workbook = `<?xml version="1.0"?>
+        <?mso-application progid="Excel.Sheet"?>
+        <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+          xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:x="urn:schemas-microsoft-com:office:excel"
+          xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+          ${createWorksheet('Summary', [
+            ['Student Fee Analytics'],
+            ['Date filter', filterDescription],
+            ['Registered students', filteredStudents.length],
+            ['Total fees', feeData.totalFees],
+            ['Fees collected', feeData.collected],
+            ['Outstanding fees', feeData.outstanding],
+            ['Collection rate (%)', Number(collectionRate.toFixed(2))]
+          ])}
+          ${createWorksheet('Course Fees', [
+            ['Course', 'Fees Collected (INR)', 'Outstanding Fees (INR)', 'Total Fees (INR)'],
+            ...feeData.courses.map((course) => [
+              course.course,
+              course.collected,
+              course.outstanding,
+              course.totalFees
+            ]),
+            ['Total', feeData.collected, feeData.outstanding, feeData.totalFees]
+          ])}
+        </Workbook>`;
+      const blob = new Blob(['\uFEFF', workbook], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `student-fee-analytics-${new Date().toISOString().slice(0, 10)}.xls`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    } catch (error) {
+      console.error('Failed to export student fee analytics:', error);
+      setExportError(error instanceof Error ? error.message : 'Failed to export the report.');
+    }
+  };
 
   return (
     <div className="analytics-container">
       {/* Header with Filters */}
       <div className="analytics-header">
         <div>
-          <h2 className="analytics-title">Company Growth & Performance</h2>
+          <h2 className="analytics-title">Student Fee Analytics</h2>
           <p className="analytics-subtitle">
-            Financial growth trajectory, learner scaling, and operational efficiency
+            Student fee collection and outstanding balances by course
           </p>
         </div>
 
         <div className="analytics-actions">
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            className="year-select"
+          <button
+            type="button"
+            className="export-report-btn"
+            onClick={handleExport}
+            disabled={loadingStudents || Boolean(studentsError)}
           >
-            <option value="2024">Year 2024 (Current)</option>
-            <option value="2023">Year 2023</option>
-            <option value="2022">Year 2022</option>
-          </select>
-          <button className="export-report-btn">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
@@ -87,6 +234,7 @@ const Analytics = () => {
           </button>
         </div>
       </div>
+      {exportError && <p className="fee-export-error" role="alert">{exportError}</p>}
 
       {/* Top 4 Growth Highlight Cards */}
       <div className="growth-stats-grid">
@@ -94,16 +242,8 @@ const Analytics = () => {
           <div key={stat.id} className="growth-stat-card">
             <span className="stat-title">{stat.title}</span>
             <div className="stat-body">
-              <span className="stat-value">{stat.value}</span>
-              <div className="stat-badge-group">
-                <span className="stat-badge">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                    <polyline points="18 15 12 9 6 15" />
-                  </svg>
-                  {stat.change}
-                </span>
-                <span className="stat-period">{stat.period}</span>
-              </div>
+              <span className="stat-value">{summaryValue(stat.value)}</span>
+              <div className="stat-period">{stat.period}</div>
             </div>
           </div>
         ))}
@@ -115,113 +255,148 @@ const Analytics = () => {
         <div className="chart-panel">
           <div className="chart-panel-header">
             <div>
-              <h3 className="panel-title">Revenue Trajectory ($ in thousands)</h3>
-              <p className="panel-sub">Monthly cash generation & new subscriptions</p>
+              <h3 className="panel-title">Fees Collected vs. Outstanding</h3>
+              <p className="panel-sub">Amounts for students admitted in the selected period</p>
             </div>
-            <div className="legend-group">
-              <div className="legend-item">
-                <span className="legend-dot dot-primary"></span>
-                <span>Gross Revenue</span>
-              </div>
-              <div className="legend-item">
-                <span className="legend-dot dot-secondary"></span>
-                <span>Net Growth</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Bar Chart Representation */}
-          <div className="bars-chart-container">
-            {monthlyData.map((item, idx) => {
-              const revHeight = (item.revenue / maxRevenue) * 100;
-              const growthHeight = (item.growth / maxRevenue) * 100;
-
-              return (
-                <div
-                  key={idx}
-                  className="bar-column-wrapper"
-                  onMouseEnter={() => setActiveHover(item)}
-                  onMouseLeave={() => setActiveHover(null)}
+            <div className="fee-chart-controls">
+              <div className="fee-date-filters" role="group" aria-label="Filter fee analytics by admission date">
+                <select
+                  className="fee-date-filter"
+                  aria-label="Filter by year"
+                  value={selectedYear}
+                  onChange={(event) => setSelectedYear(event.target.value)}
                 >
-                  <div className="bars-group">
-                    <div
-                      className="bar-fill bar-primary"
-                      style={{ height: `${revHeight}%` }}
-                      title={`Revenue: $${item.revenue}k`}
-                    ></div>
-                    <div
-                      className="bar-fill bar-secondary"
-                      style={{ height: `${growthHeight}%` }}
-                      title={`Growth: +${item.growth}%`}
-                    ></div>
-                  </div>
-                  <span className="bar-label">{item.month}</span>
+                  <option value="all">All years</option>
+                  {availableYears.map((year) => (
+                    <option value={year} key={year}>{year}</option>
+                  ))}
+                </select>
+                <select
+                  className="fee-date-filter"
+                  aria-label="Filter by month"
+                  value={selectedMonth}
+                  onChange={(event) => setSelectedMonth(event.target.value)}
+                >
+                  <option value="all">All months</option>
+                  {Array.from({ length: 12 }, (_, index) => (
+                    <option value={index + 1} key={index}>
+                      {new Intl.DateTimeFormat('en', { month: 'long' }).format(new Date(2024, index, 1))}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="fee-date-filter"
+                  aria-label="Filter by day"
+                  value={selectedDay}
+                  onChange={(event) => setSelectedDay(event.target.value)}
+                >
+                  <option value="all">All days</option>
+                  {Array.from({ length: 31 }, (_, index) => (
+                    <option value={index + 1} key={index}>{index + 1}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="legend-group">
+                <div className="legend-item">
+                  <span className="legend-dot dot-primary"></span>
+                  <span>Collected</span>
                 </div>
-              );
-            })}
+                <div className="legend-item">
+                  <span className="legend-dot dot-secondary"></span>
+                  <span>Outstanding</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Hover Details */}
-          {activeHover && (
-            <div className="hover-status-box">
-              <span>{activeHover.month} Highlights:</span>
-              <strong>Gross: ${activeHover.revenue},000</strong>
-              <span className="badge-inline">+{activeHover.growth}% Expansion</span>
+          {loadingStudents ? (
+            <div className="fee-chart-message">Loading student fee data...</div>
+          ) : studentsError ? (
+            <div className="fee-chart-message" role="alert">{studentsError}</div>
+          ) : feeData.courses.length ? (
+            <div className="fee-chart-layout">
+              <div className="fee-y-axis" aria-hidden="true">
+                  <span className="fee-y-axis-title">Fees (INR)</span>
+                  <div className="fee-y-axis-ticks">
+                    {feeAxisTicks.map((tick, index) => (
+                      <span key={index}>{formatCurrency(tick)}</span>
+                    ))}
+                  </div>
+              </div>
+              <div className="fee-chart-scroll">
+                  <div className="fee-chart-container">
+                    {feeData.courses.map((item) => (
+                      <div className="fee-chart-column" key={item.course}>
+                        <div
+                          className="fee-bars-group"
+                          role="group"
+                          tabIndex={0}
+                          aria-label={`${item.course}: ${formatCurrency(item.collected)} collected, ${formatCurrency(item.outstanding)} outstanding`}
+                        >
+                          <div
+                            className="fee-chart-tooltip"
+                            role="status"
+                          >
+                            <strong>{item.course}</strong>
+                            <span><i className="tooltip-dot tooltip-dot-collected" />Collected: {formatCurrency(item.collected)}</span>
+                            <span><i className="tooltip-dot tooltip-dot-outstanding" />Outstanding: {formatCurrency(item.outstanding)}</span>
+                          </div>
+                          <div
+                            className="fee-bar fee-bar-collected"
+                            style={{ height: `${(item.collected / maxFeeAmount) * 100}%` }}
+                          />
+                          <div
+                            className="fee-bar fee-bar-outstanding"
+                            style={{ height: `${(item.outstanding / maxFeeAmount) * 100}%` }}
+                          />
+                        </div>
+                        <span className="fee-chart-label" title={item.course}>
+                          {item.course}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="fee-x-axis-title">Course</div>
+              </div>
             </div>
+          ) : (
+            <div className="fee-chart-message">No student fee data is available for the selected date.</div>
           )}
         </div>
 
         {/* Growth Drivers / Side Breakdown */}
         <div className="breakdown-panel">
-          <h3 className="panel-title">Growth Channels</h3>
-          <p className="panel-sub">Top sources contributing to year's revenue</p>
+          <h3 className="panel-title">Fee Collection Summary</h3>
+          <p className="panel-sub">Collected and outstanding student fees</p>
 
           <div className="channel-list">
             <div className="channel-item">
               <div className="channel-meta">
-                <span className="channel-name">Online Direct Enrollments</span>
-                <span className="channel-val">52% ($282K)</span>
+                <span className="channel-name">Fees collected</span>
+                <span className="channel-val">{summaryValue(formatCurrency(feeData.collected))}</span>
               </div>
               <div className="prog-track">
-                <div className="prog-bar" style={{ width: '52%', backgroundColor: '#7c3aed' }}></div>
+                <div className="prog-bar" style={{ width: `${collectionRate}%`, backgroundColor: '#7c3aed' }}></div>
               </div>
             </div>
 
             <div className="channel-item">
               <div className="channel-meta">
-                <span className="channel-name">Enterprise & Corporate Training</span>
-                <span className="channel-val">28% ($151K)</span>
+                <span className="channel-name">Outstanding fees</span>
+                <span className="channel-val">{summaryValue(formatCurrency(feeData.outstanding))}</span>
               </div>
               <div className="prog-track">
-                <div className="prog-bar" style={{ width: '28%', backgroundColor: '#0284c7' }}></div>
-              </div>
-            </div>
-
-            <div className="channel-item">
-              <div className="channel-meta">
-                <span className="channel-name">Campus University Partnerships</span>
-                <span className="channel-val">14% ($76K)</span>
-              </div>
-              <div className="prog-track">
-                <div className="prog-bar" style={{ width: '14%', backgroundColor: '#10b981' }}></div>
-              </div>
-            </div>
-
-            <div className="channel-item">
-              <div className="channel-meta">
-                <span className="channel-name">Certification Exam Fees</span>
-                <span className="channel-val">6% ($33K)</span>
-              </div>
-              <div className="prog-track">
-                <div className="prog-bar" style={{ width: '6%', backgroundColor: '#f59e0b' }}></div>
+                <div className="prog-bar" style={{ width: `${100 - collectionRate}%`, backgroundColor: '#c084fc' }}></div>
               </div>
             </div>
           </div>
 
           <div className="growth-summary-box">
-            <h4>Executive Summary</h4>
-            <p>
-              Company reached break-even operational cashflow in Q2, with quarterly student acquisition cost decreasing by <strong>18.4%</strong>.
+            <h4>Collection rate</h4>
+            <p role={studentsError ? 'alert' : undefined}>
+              {studentsError || (loadingStudents
+                ? 'Loading fee collection summary...'
+                : `${collectionRate.toFixed(1)}% of recorded student fees have been collected from ${filteredStudents.length} students in the selected period.`)}
             </p>
           </div>
         </div>
