@@ -91,7 +91,7 @@ const RecentStudent = () => {
       <div className="recent-header">
         <div>
           <h3 className="recent-title">Recent Student Registrations</h3>
-          <p className="recent-subtitle">Students registered in the last 3 days (latest 10)</p>
+          <p className="recent-subtitle">The 10 most recently registered students</p>
         </div>
         <div className="header-actions">
           <form
@@ -164,7 +164,7 @@ const RecentStudent = () => {
                 <td colSpan="6" className="no-data-cell">
                   {searchQuery
                     ? "No recent students match your search."
-                    : "No students registered in the last 3 days."}
+                    : "No students have been registered yet."}
                 </td>
               </tr>
             )}

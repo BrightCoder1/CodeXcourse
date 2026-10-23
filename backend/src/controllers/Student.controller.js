@@ -149,8 +149,7 @@ const getStudentCount = async (req, res) => {
 
 const getRecentStudents = async (req, res) => {
     try {
-        const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-        const students = await Student.find({ createdAt: { $gte: threeDaysAgo } })
+        const students = await Student.find()
             .sort({ createdAt: -1 })
             .limit(10);
 
