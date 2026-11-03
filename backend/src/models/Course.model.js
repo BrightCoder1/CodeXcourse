@@ -40,7 +40,7 @@ const courseSchema = new mongoose.Schema(
         status: {
             type: String,
             enum: ['Active', 'Inactive', 'Upcoming', 'Completed'],
-            default: 'Active'
+            default: 'Upcoming'
         },
         courseImageUrl: {
             type: String,
@@ -52,10 +52,6 @@ const courseSchema = new mongoose.Schema(
         timestamps: true
     }
 );
-
-
-courseSchema.index({ courseCode: 1 });
-
 const Course = mongoose.model('Course', courseSchema);
 
 module.exports = Course;

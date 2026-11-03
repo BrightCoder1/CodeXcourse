@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import axios from 'axios';
+
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/$/, '');
 
 const Contact = () => {
     const [formData, setFormData] = useState({
@@ -10,6 +13,9 @@ const Contact = () => {
     });
 
     const [submitted, setSubmitted] = useState(false);
+    const [submittedName, setSubmittedName] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState('');
 
     const inquiryTypes = [
         'Course Admission',
@@ -27,12 +33,26 @@ const Contact = () => {
         setFormData((prev) => ({ ...prev, subject: type }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // Simulate API call / form submission
-        setSubmitted(true);
-        setTimeout(() => {
-            setSubmitted(false);
+        setIsSubmitting(true);
+        setSubmitError('');
+
+        try {
+            const response = await axios.post(`${API_URL}/message`, {
+                ask_about: formData.subject,
+                fullname: formData.fullName,
+                email: formData.email,
+                phone: formData.phone,
+                query: formData.message
+            });
+
+            if (!response.data?.success) {
+                throw new Error(response.data?.message || 'Unable to send your message.');
+            }
+
+            setSubmittedName(formData.fullName);
+            setSubmitted(true);
             setFormData({
                 fullName: '',
                 email: '',
@@ -40,7 +60,16 @@ const Contact = () => {
                 subject: 'Course Admission',
                 message: ''
             });
-        }, 4500);
+            setTimeout(() => setSubmitted(false), 4500);
+        } catch (error) {
+            setSubmitError(
+                error.response?.data?.message
+                || error.message
+                || 'Unable to send your message. Please try again.'
+            );
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -132,7 +161,7 @@ const Contact = () => {
                                 <div className="success-icon">✓</div>
                                 <h3>Message Sent Successfully!</h3>
                                 <p>
-                                    Thank you, <strong>{formData.fullName || 'Student'}</strong>. One of our senior academic
+                                    Thank you, <strong>{submittedName || 'Student'}</strong>. One of our senior academic
                                     counselors will get in touch with you shortly.
                                 </p>
                             </div>
@@ -142,6 +171,8 @@ const Contact = () => {
                                     <h3>Send a Message</h3>
                                     <p>Fill out the details below and we will get back to you promptly.</p>
                                 </div>
+
+                                {submitError && <p className="form-error" role="alert">{submitError}</p>}
 
                                 {/* Inquiry Type Filter Pills */}
                                 <div className="inquiry-group">
@@ -214,8 +245,8 @@ const Contact = () => {
                                     ></textarea>
                                 </div>
 
-                                <button type="submit" className="submit-btn">
-                                    Submit Inquiry
+                                <button type="submit" className="submit-btn" disabled={isSubmitting}>
+                                    {isSubmitting ? 'Sending...' : 'Submit Inquiry'}
                                     <span className="arrow">→</span>
                                 </button>
                             </form>

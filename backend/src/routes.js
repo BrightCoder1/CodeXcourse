@@ -24,6 +24,7 @@ const {
   deleteStudent
 } = require("./controllers/Student.controller.js");
 const { createCourse, getAllCourses, getCourseById, updateCourse, deleteCourse } = require("./controllers/Course.controller.js");
+const { createMessage } = require("./controllers/Message.controller.js");
 
 
 // Public Auth routes
@@ -60,6 +61,7 @@ router.delete('/student/:id', adminAuth, deleteStudent);
 router.route("/courses")
   .post(adminAuth, createCourse)
   .get(adminAuth, getAllCourses);
+
 router.route("/courses/:id")
   .get(adminAuth, getCourseById)
   .put(adminAuth, updateCourse)
@@ -71,6 +73,14 @@ router.get("/get/course", adminAuth, getAllCourses);
 router.get("/get/course/:id", adminAuth, getCourseById);
 router.put("/update/course/:id", adminAuth, updateCourse);
 router.delete("/delete/course/:id", adminAuth, deleteCourse);
+
+
+// Display the All courses on Main Web.
+router.get("/display/course", getAllCourses);
+
+// Public contact form message submission.
+router.post("/message", createMessage);
+
 
 
 // 404 Fallback
