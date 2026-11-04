@@ -98,12 +98,6 @@ const Finance = () => {
   const [receivedBy, setReceivedBy] = useState("");
   const [remark, setRemark] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [editingPayment, setEditingPayment] = useState(null);
-  const [editAmount, setEditAmount] = useState("");
-  const [editMethod, setEditMethod] = useState("Cash");
-  const [editReceiver, setEditReceiver] = useState("");
-  const [editRemark, setEditRemark] = useState("");
-  const [updatingPayment, setUpdatingPayment] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -165,7 +159,6 @@ const Finance = () => {
       submittedTo: transaction.received_by || "—",
       remark: transaction.remark || "",
       date: transaction.paid_at,
-      voided: Boolean(transaction.voided_at),
     }))
   )), [students]);
 
@@ -247,86 +240,6 @@ const Finance = () => {
     }
   };
 
-  const startPaymentEdit = (payment) => {
-    setEditingPayment(payment);
-    setEditAmount(String(payment.amount));
-    setEditMethod(payment.payment_method || "Other");
-    setEditReceiver(payment.received_by || "");
-    setEditRemark(payment.remark || "");
-    setSubmitError("");
-    setSuccessMessage("");
-  };
-
-  const handlePaymentUpdate = async (event) => {
-    event.preventDefault();
-    if (!selectedStudent || !editingPayment) return;
-
-    const amount = Number(editAmount);
-    const maximumAmount = selectedStudent.pendingFee + Number(editingPayment.amount);
-    if (!Number.isFinite(amount) || amount <= 0 || amount > maximumAmount) {
-      setSubmitError(`Updated payment must be between ₹0.01 and ${formatMoney(maximumAmount)}.`);
-      return;
-    }
-    if (!editReceiver.trim()) {
-      setSubmitError("Please enter the name of the staff member who received this payment.");
-      return;
-    }
-
-    setUpdatingPayment(true);
-    setSubmitError("");
-    setSuccessMessage("");
-    try {
-      const savedStudent = normalizeStudent(await authService.updateStudentFeePayment(
-        selectedStudent.mongoId,
-        editingPayment.receipt_number,
-        {
-          amount,
-          payment_method: editMethod,
-          received_by: editReceiver.trim(),
-          remark: editRemark.trim(),
-        }
-      ));
-      setStudents((current) => current.map((student) => (
-        student.mongoId === savedStudent.mongoId ? savedStudent : student
-      )));
-      setSelectedStudent(savedStudent);
-      setEditingPayment(null);
-      setSuccessMessage(`Payment ${editingPayment.receipt_number} was updated.`);
-    } catch (error) {
-      setSubmitError(error.response?.data?.message || error.message || "Unable to update this payment.");
-    } finally {
-      setUpdatingPayment(false);
-    }
-  };
-
-  const handlePaymentReverse = async (payment) => {
-    if (!selectedStudent || payment.voided_at) return;
-    const confirmed = window.confirm(
-      `Reverse ${formatMoney(payment.amount)} payment ${payment.receipt_number} for ${selectedStudent.name}? The record will remain in history, and the amount will be restored to the student's pending fee.`
-    );
-    if (!confirmed) return;
-
-    setSubmitError("");
-    setSuccessMessage("");
-    try {
-      const savedStudent = normalizeStudent(await authService.reverseStudentFeePayment(
-        selectedStudent.mongoId,
-        payment.receipt_number,
-        "Reversed by admin"
-      ));
-      setStudents((current) => current.map((student) => (
-        student.mongoId === savedStudent.mongoId ? savedStudent : student
-      )));
-      setSelectedStudent(savedStudent);
-      if (editingPayment?.receipt_number === payment.receipt_number) {
-        setEditingPayment(null);
-      }
-      setSuccessMessage(`Payment ${payment.receipt_number} was reversed. You can now submit it for the correct student.`);
-    } catch (error) {
-      setSubmitError(error.response?.data?.message || error.message || "Unable to reverse this payment.");
-    }
-  };
-
   const downloadFeeListPdf = () => {
     const rows = students.map((student) => `<tr>
       <td>${escapeHtml(student.id)}</td>
@@ -362,15 +275,14 @@ const Finance = () => {
       <td class="amount received">${escapeHtml(formatMoney(transaction.amountPaid))}</td>
       <td class="amount pending">${escapeHtml(formatMoney(transaction.remainingBalance))}</td>
       <td>${escapeHtml(transaction.submittedTo)}</td>
-      <td>${transaction.voided ? "REVERSED" : "Active"}</td>
     </tr>`).join("");
     openPdfWindow("Submitted Fee Payments", `
       <h1>Submitted Fee Payments</h1>
       <p class="subtitle">Generated ${escapeHtml(new Date().toLocaleString("en-IN"))}${transactionSearch.trim() ? ` · Filter: ${escapeHtml(transactionSearch.trim())}` : ""}</p>
       <table>
         <thead><tr><th>Receipt</th><th>Student ID</th><th>Student</th><th>Course</th><th>Date</th>
-          <th>Method</th><th class="amount">Paid</th><th class="amount">Pending</th><th>Received by</th><th>Status</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="10">No fee payments found.</td></tr>'}</tbody>
+          <th>Method</th><th class="amount">Paid</th><th class="amount">Pending</th><th>Received by</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="9">No fee payments found.</td></tr>'}</tbody>
       </table>
       <p class="footer">Saved student payment history.</p>
     `);
@@ -625,112 +537,19 @@ const Finance = () => {
                 </button>
               </div>
               <div className="table-responsive">
-                {editingPayment && (
-                  <form className="edit-fee-payment-form" onSubmit={handlePaymentUpdate}>
-                    <div className="fee-history-header">
-                      <div>
-                        <h4 className="panel-heading">Edit Payment {editingPayment.receipt_number}</h4>
-                        <p className="panel-subtext">Amount can be raised only up to the student's remaining fee.</p>
-                      </div>
-                      <button
-                        type="button"
-                        className="download-slip-btn"
-                        onClick={() => setEditingPayment(null)}
-                        disabled={updatingPayment}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label htmlFor="edit-fee-amount">Payment Amount (₹)</label>
-                        <input
-                          id="edit-fee-amount"
-                          type="number"
-                          min="0.01"
-                          max={selectedStudent.pendingFee + Number(editingPayment.amount)}
-                          step="0.01"
-                          value={editAmount}
-                          onChange={(event) => setEditAmount(event.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label htmlFor="edit-fee-method">Payment Method</label>
-                        <select id="edit-fee-method" value={editMethod} onChange={(event) => setEditMethod(event.target.value)}>
-                          <option value="Cash">Cash</option>
-                          <option value="UPI">UPI</option>
-                          <option value="Card">Card</option>
-                          <option value="Bank Transfer">Bank Transfer</option>
-                          <option value="Other">Other</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="form-row">
-                      <div className="form-group">
-                        <label htmlFor="edit-fee-receiver">Received By</label>
-                        <input
-                          id="edit-fee-receiver"
-                          type="text"
-                          maxLength="100"
-                          value={editReceiver}
-                          onChange={(event) => setEditReceiver(event.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label htmlFor="edit-fee-remark">Remark</label>
-                        <input
-                          id="edit-fee-remark"
-                          type="text"
-                          maxLength="500"
-                          value={editRemark}
-                          onChange={(event) => setEditRemark(event.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <button className="submit-fee-btn" type="submit" disabled={updatingPayment}>
-                      {updatingPayment ? "Updating Payment..." : "Save Payment Correction"}
-                    </button>
-                  </form>
-                )}
                 <table className="finance-table">
-                  <thead><tr><th>Receipt</th><th>Date</th><th>Paid</th><th>Pending</th><th>Method</th><th>Status / Correction</th></tr></thead>
+                  <thead><tr><th>Receipt</th><th>Date</th><th>Paid</th><th>Pending</th><th>Method</th></tr></thead>
                   <tbody>
                     {selectedTransactions.length ? selectedTransactions.map((payment, index) => (
                       <tr key={payment.receipt_number || `${payment.paid_at}-${index}`}>
                         <td className="tx-id-cell">{payment.receipt_number || "—"}</td>
                         <td>{formatDate(payment.paid_at)}</td>
-                        <td className={payment.voided_at ? "amount-remain-cell" : "amount-paid-cell"}>{formatMoney(payment.amount)}</td>
+                        <td className="amount-paid-cell">{formatMoney(payment.amount)}</td>
                         <td className="amount-remain-cell">{formatMoney(payment.pending_amount)}</td>
                         <td><span className="pay-mode-pill">{payment.payment_method || "—"}</span></td>
-                        <td>
-                          {payment.voided_at ? (
-                            <span className="payment-voided-badge">Reversed</span>
-                          ) : (
-                            <div className="payment-correction-actions">
-                              <button
-                                type="button"
-                                className="edit-payment-btn"
-                                onClick={() => startPaymentEdit(payment)}
-                                disabled={!payment.receipt_number}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                className="reverse-payment-btn"
-                                onClick={() => handlePaymentReverse(payment)}
-                                disabled={!payment.receipt_number}
-                              >
-                                Reverse
-                              </button>
-                            </div>
-                          )}
-                        </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan="6" className="no-tx-data">No fee payments have been recorded for this student.</td></tr>
+                      <tr><td colSpan="5" className="no-tx-data">No fee payments have been recorded for this student.</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -813,21 +632,15 @@ const Finance = () => {
                   <td className="tx-id-cell">{transaction.txnId}</td>
                   <td><div className="tx-student-meta"><strong>{transaction.studentName}</strong><small className="mono-id">{transaction.studentId}</small></div></td>
                   <td>{transaction.course}</td>
-                  <td className={transaction.voided ? "amount-remain-cell" : "amount-paid-cell"}>
-                    {transaction.voided ? "Reversed " : "+"}{formatMoney(transaction.amountPaid)}
-                  </td>
+                  <td className="amount-paid-cell">+{formatMoney(transaction.amountPaid)}</td>
                   <td className="amount-remain-cell">{formatMoney(transaction.remainingBalance)}</td>
                   <td><span className="pay-mode-pill">{transaction.paymentMode}</span></td>
                   <td className="submitted-to-cell">{transaction.submittedTo}</td>
                   <td>{formatDate(transaction.date)}</td>
                   <td style={{ textAlign: "right" }}>
-                    {transaction.voided ? (
-                      <span className="payment-voided-badge">Reversed</span>
-                    ) : (
-                      <button className="download-slip-btn" type="button" onClick={() => downloadReceiptPdf(transaction)} title="Print or save PDF receipt">
-                        PDF Slip
-                      </button>
-                    )}
+                    <button className="download-slip-btn" type="button" onClick={() => downloadReceiptPdf(transaction)} title="Print or save PDF receipt">
+                      PDF Slip
+                    </button>
                   </td>
                 </tr>
               )) : (

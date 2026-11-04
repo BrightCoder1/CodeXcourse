@@ -408,8 +408,6 @@ const getlogout = async (req, res) => {
 
 const updateProfile = async (req, res) => {
     try {
-        const { emp_name, email, contact_number, address } = req.body;
-
         const user = await User.findById(req.user._id);
 
         if (!user) {
@@ -419,31 +417,94 @@ const updateProfile = async (req, res) => {
             });
         }
 
-        if (emp_name !== undefined) {
-            user.emp_name = emp_name;
+        const newPassword = req.body.password;
+        if (newPassword !== undefined && newPassword !== "") {
+            if (typeof newPassword !== "string" || newPassword.length < 6) {
+                return res.status(400).json({
+                    success: false,
+                    message: "New password must be at least 6 characters."
+                });
+            }
+            if (typeof req.body.current_password !== "string" || !req.body.current_password) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Current password is required to change your password."
+                });
+            }
+
+            const currentPasswordMatches = await user.comparePassword(req.body.current_password);
+            if (!currentPasswordMatches) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Current password is incorrect."
+                });
+            }
         }
 
-        if (email !== undefined) {
-            const normalizedEmail = email.trim().toLowerCase();
+        const editableFields = [
+            "emp_name",
+            "email",
+            "contact_number",
+            "emp_dob",
+            "emp_qualification",
+            "emp_department",
+            "emp_course",
+            "emp_joining_date",
+            "emp_status",
+            "emp_attendance",
+            "emp_aadharnumber",
+            "pan_number",
+            "address",
+            "accountnumber",
+            "ifsc_code"
+        ];
+        const optionalFields = [
+            "emp_aadharnumber",
+            "pan_number",
+            "address",
+            "accountnumber",
+            "ifsc_code"
+        ];
 
+        if (Object.prototype.hasOwnProperty.call(req.body, "email")) {
+            if (typeof req.body.email !== "string" || !req.body.email.trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: "A valid email address is required."
+                });
+            }
+
+            const normalizedEmail = req.body.email.trim().toLowerCase();
             if (normalizedEmail !== user.email) {
-                const existingUser = await User.findOne({ email: normalizedEmail });
+                const existingUser = await User.findOne({
+                    email: normalizedEmail,
+                    _id: { $ne: user._id }
+                }).select("_id");
                 if (existingUser) {
                     return res.status(409).json({
                         success: false,
                         message: "Email is already registered."
                     });
                 }
-                user.email = normalizedEmail;
             }
+            user.email = normalizedEmail;
         }
 
-        if (contact_number !== undefined) {
-            user.contact_number = contact_number;
+        for (const field of editableFields) {
+            if (field === "email" || !Object.prototype.hasOwnProperty.call(req.body, field)) {
+                continue;
+            }
+
+            const value = req.body[field];
+            user[field] = optionalFields.includes(field) &&
+                typeof value === "string" &&
+                !value.trim()
+                ? undefined
+                : value;
         }
 
-        if (address !== undefined) {
-            user.address = address;
+        if (newPassword) {
+            user.password = newPassword;
         }
 
         await user.save();
@@ -458,6 +519,13 @@ const updateProfile = async (req, res) => {
         });
 
     } catch (error) {
+        if (error.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message: "Email is already registered."
+            });
+        }
+
         if (error.name === "ValidationError") {
             return res.status(400).json({
                 success: false,

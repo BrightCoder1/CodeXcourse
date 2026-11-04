@@ -3133,66 +3133,6 @@ registration-strip-container {
     margin-bottom: 0;
 }
 
-.edit-fee-payment-form {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 16px;
-    padding: 14px;
-    border: 1px solid #ddd6fe;
-    border-radius: 10px;
-    background: #faf8ff;
-}
-
-.payment-correction-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 6px;
-}
-
-.edit-payment-btn,
-.reverse-payment-btn {
-    padding: 5px 9px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    background: #fff;
-    color: #5b21b6;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.edit-payment-btn:hover:not(:disabled) {
-    border-color: #7c3aed;
-    background: #f5f3ff;
-}
-
-.reverse-payment-btn {
-    color: #b91c1c;
-}
-
-.reverse-payment-btn:hover:not(:disabled) {
-    border-color: #ef4444;
-    background: #fef2f2;
-}
-
-.edit-payment-btn:disabled,
-.reverse-payment-btn:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
-.payment-voided-badge {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 6px;
-    background: #f3f4f6;
-    color: #6b7280;
-    font-size: 11px;
-    font-weight: 700;
-}
-
 /* Recent Transactions Table */
 .card-top-header {
     display: flex;
