@@ -96,6 +96,9 @@
 
 /* --- Profile Section --- */
 .profile-wrapper {
+  background-color: #e7ded0;
+  border-radius: 16px;
+  padding: 6px 9px;
   position: relative;
   margin-left: 6px;
 }

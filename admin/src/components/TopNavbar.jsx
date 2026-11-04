@@ -64,11 +64,11 @@ export default function TopNavbar() {
                         aria-label="User menu"
                         aria-expanded={dropdownOpen}
                     >
-                        <img
+                        {/* <img
                             src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces"
                             alt="Admin avatar"
                             className="profile-avatar"
-                        />
+                        /> */}
                         <span className="profile-name">
                             {displayName.toUpperCase()}
                         </span>
