@@ -4,12 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import './TopNavbar.css';
 
 const Icons = {
-    Search: () => (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-    ),
     Bell: () => (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -31,11 +25,9 @@ const Icons = {
 
 
 export default function TopNavbar() {
-    const [searchValue, setSearchValue] = useState('');
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const navigate = useNavigate();
     const { user, logout } = useAuth();
-    console.log('TopNavbar user:', user); // Debugging line to check the user object
     const displayName = user?.emp_name?.trim() || user?.name?.trim() || user?.email || 'Admin';
 
     const handleLogout = async (e) => {
@@ -54,28 +46,15 @@ export default function TopNavbar() {
 
     return (
         <header className="top-navbar">
-            <div className="search-box">
-                <span className="search-icon">
-                    <Icons.Search />
-                </span>
-                <input
-                    type="text"
-                    placeholder="Search..."
-                    value={searchValue}
-                    onChange={(event) => setSearchValue(event.target.value)}
-                    className="search-input"
-                />
-            </div>
-
             <div className="top-navbar-actions">
-                <button type="button" className="icon-btn" aria-label="Notifications">
+                {/* <button type="button" className="icon-btn" aria-label="Notifications">
                     <Icons.Bell />
                     <span className="notification-badge" />
                 </button>
 
                 <button type="button" className="icon-btn" aria-label="Messages">
                     <Icons.Mail />
-                </button>
+                </button> */}
 
                 <div className="profile-wrapper" style={{ position: 'relative' }}>
                     <button
