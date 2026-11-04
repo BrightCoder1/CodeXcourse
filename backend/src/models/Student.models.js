@@ -108,6 +108,20 @@ const studentSchema = new mongoose.Schema(
         },
         transaction_id: { type: String, trim: true },
         last_payment_date: { type: Date },
+        payment_history: [{
+            receipt_number: { type: String, required: true },
+            amount: { type: Number, required: true, min: 0.01 },
+            payment_method: {
+                type: String,
+                enum: ['Cash', 'UPI', 'Card', 'Bank Transfer', 'Other'],
+                required: true
+            },
+            received_by: { type: String, trim: true },
+            remark: { type: String, trim: true },
+            paid_at: { type: Date, default: Date.now },
+            total_fee: { type: Number, required: true },
+            pending_amount: { type: Number, required: true }
+        }],
 
         // Remarks
         remarks: { type: String, trim: true }

@@ -1,4 +1,6 @@
 const Student = require('../models/Student.models');
+const mongoose = require('mongoose');
+const { randomBytes } = require('crypto');
 
 const student_register = async (req, res) => {
     try {
@@ -189,6 +191,129 @@ const getStudentById = async (req, res) => {
     }
 };
 
+const submitStudentFee = async (req, res) => {
+    try {
+        const amount = Number(req.body.amount);
+        const paymentMethods = ['Cash', 'UPI', 'Card', 'Bank Transfer', 'Other'];
+        const paymentMethod = req.body.payment_method;
+        const receivedBy = typeof req.body.received_by === 'string'
+            ? req.body.received_by.trim()
+            : '';
+        const remark = typeof req.body.remark === 'string'
+            ? req.body.remark.trim()
+            : '';
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Payment amount must be greater than zero.'
+            });
+        }
+        if (!paymentMethods.includes(paymentMethod)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please select a valid payment method.'
+            });
+        }
+        if (!receivedBy || receivedBy.length > 100) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide a receiver name (maximum 100 characters).'
+            });
+        }
+        if (remark.length > 500) {
+            return res.status(400).json({
+                success: false,
+                message: 'Remark must be 500 characters or fewer.'
+            });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid student ID.'
+            });
+        }
+
+        let student = null;
+        for (let attempt = 0; attempt < 3 && !student; attempt += 1) {
+            const currentStudent = await Student.findById(req.params.id);
+            if (!currentStudent) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Student not found.'
+                });
+            }
+
+            const totalFee = Number(currentStudent.total_fee) || 0;
+            const currentPaid = Number(currentStudent.paid_amount) || 0;
+            const currentPending = Math.max(0, totalFee - currentPaid);
+            if (amount > currentPending) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Payment amount cannot exceed the student's pending fee."
+                });
+            }
+
+            const nextPaid = currentPaid + amount;
+            const nextPending = Math.max(0, totalFee - nextPaid);
+            const paidAt = new Date();
+            const payment = {
+                receipt_number: `FEE-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`,
+                amount,
+                payment_method: paymentMethod,
+                received_by: receivedBy,
+                remark,
+                paid_at: paidAt,
+                total_fee: totalFee,
+                pending_amount: nextPending
+            };
+
+            student = await Student.findOneAndUpdate(
+                {
+                    _id: currentStudent._id,
+                    $expr: {
+                        $and: [
+                            { $eq: [{ $ifNull: ['$paid_amount', 0] }, currentPaid] },
+                            { $eq: [{ $ifNull: ['$total_fee', 0] }, totalFee] }
+                        ]
+                    }
+                },
+                {
+                    $set: {
+                        paid_amount: nextPaid,
+                        pending_amount: nextPending,
+                        payment_status: nextPending === 0 ? 'Paid' : 'Partial',
+                        payment_method: paymentMethod,
+                        last_payment_date: paidAt
+                    },
+                    $push: { payment_history: payment }
+                },
+                { new: true, runValidators: true }
+            );
+        }
+
+        if (!student) {
+            return res.status(409).json({
+                success: false,
+                message: 'The student fee changed during payment. Please refresh and try again.'
+            });
+        }
+
+        return res.status(201).json({
+            success: true,
+            message: 'Student fee payment recorded successfully.',
+            data: student
+        });
+    } catch (error) {
+        console.error('Submit Student Fee Error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to record student fee payment.'
+        });
+    }
+};
+
 // 4. Update Student Details
 const updateStudent = async (req, res) => {
     try {
@@ -353,6 +478,7 @@ module.exports = {
     getStudentCount,
     getRecentStudents,
     getStudentById,
+    submitStudentFee,
     updateStudent,
     deleteStudent
 };

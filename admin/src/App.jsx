@@ -77,7 +77,7 @@ function AppRoutes() {
           <Route path="/students" element={<Student />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/finances" element={<Finance />} />
-          <Route path="/settings" element={<Setting />} />
+          {/* <Route path="/settings" element={<Setting />} /> */}
           <Route path="/profile" element={<Profile />} />
           <Route path="/student/register" element={<StudentRegister />} />
 

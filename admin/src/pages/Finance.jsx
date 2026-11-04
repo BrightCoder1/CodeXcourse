@@ -1,611 +1,839 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from "react";
+import authService from "../services/authServices";
 
-// Initial Directory of Students
-const initialStudents = [
-  { id: 'STU-1001', name: 'Aria Chen', course: 'Intro to Python', totalFee: 1200, paidFee: 800, pendingFee: 400, lastDate: '2024-08-30' },
-  { id: 'STU-1002', name: 'Leo Novak', course: 'React basics', totalFee: 1500, paidFee: 500, pendingFee: 1000, lastDate: '2024-09-05' },
-  { id: 'STU-1003', name: 'Sophia Patel', course: 'UI/UX Design', totalFee: 1100, paidFee: 1100, pendingFee: 0, lastDate: '2024-07-20' },
-  { id: 'STU-1004', name: 'Liam Miller', course: 'Full Stack MERN', totalFee: 2000, paidFee: 1200, pendingFee: 800, lastDate: '2024-08-25' },
-  { id: 'STU-1005', name: 'Emma Watson', course: 'DSA in Java', totalFee: 1400, paidFee: 1400, pendingFee: 0, lastDate: '2024-08-10' },
-];
+const currency = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 2,
+});
 
-// Initial Transactions History
-const initialTransactions = [
-  {
-    txnId: 'TXN-9081',
-    studentName: 'Aria Chen',
-    studentId: 'STU-1001',
-    course: 'Intro to Python',
-    totalAmount: 1200,
-    amountPaid: 800,
-    remainingBalance: 400,
-    paymentMode: 'Online UPI',
-    submittedTo: 'Accounts Desk (Mr. Sharma)',
-    remarkNotice: '1st Installment cleared via UPI ref 890123',
-    date: '2024-07-18',
-    status: 'Completed',
-  },
-  {
-    txnId: 'TXN-9082',
-    studentName: 'Leo Novak',
-    studentId: 'STU-1002',
-    course: 'React basics',
-    totalAmount: 1500,
-    amountPaid: 500,
-    remainingBalance: 1000,
-    paymentMode: 'Card Payment',
-    submittedTo: 'Mrs. Verma',
-    remarkNotice: 'Balance due next month before 5th',
-    date: '2024-07-12',
-    status: 'Completed',
-  },
-  {
-    txnId: 'TXN-9083',
-    studentName: 'Sophia Patel',
-    studentId: 'STU-1003',
-    course: 'UI/UX Design',
-    totalAmount: 1100,
-    amountPaid: 1100,
-    remainingBalance: 0,
-    paymentMode: 'Net Banking',
-    submittedTo: 'Admin Office',
-    remarkNotice: 'Full course fee settled',
-    date: '2024-07-20',
-    status: 'Completed',
-  },
-];
+const formatMoney = (value) => currency.format(Number(value) || 0);
+
+const formatDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-IN");
+};
+
+const escapeHtml = (value) =>
+  String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]);
+
+const normalizeStudent = (student) => {
+  const name = [
+    student.student_name,
+    student.middle_name,
+    student.last_name,
+  ].filter(Boolean).join(" ");
+  const totalFee = Number(student.total_fee) || 0;
+  const paidFee = Number(student.paid_amount) || 0;
+
+  return {
+    ...student,
+    mongoId: student._id,
+    id: student.roll_number || student.admission_number || student.application_number || student._id,
+    name: name || "Unnamed student",
+    course: student.course || "—",
+    totalFee,
+    paidFee,
+    pendingFee: Math.max(0, totalFee - paidFee),
+    transactions: Array.isArray(student.payment_history) ? student.payment_history : [],
+  };
+};
+
+const openPdfWindow = (title, content) => {
+  const printWindow = window.open("", "_blank", "width=900,height=700");
+  if (!printWindow) {
+    window.alert("Please allow pop-ups to print or save the PDF.");
+    return;
+  }
+
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${escapeHtml(title)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #1f2937; padding: 28px; }
+          h1 { color: #5b21b6; font-size: 22px; margin: 0 0 6px; }
+          .subtitle { color: #6b7280; font-size: 12px; margin: 0 0 20px; }
+          .meta { display: flex; justify-content: space-between; gap: 12px; margin: 10px 0; font-size: 13px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+          th, td { padding: 9px 10px; text-align: left; border: 1px solid #d1d5db; font-size: 12px; }
+          th { background: #f3f0fa; }
+          .amount { text-align: right; white-space: nowrap; }
+          .received { color: #15803d; font-weight: 700; }
+          .pending { color: #b91c1c; font-weight: 700; }
+          .footer { margin-top: 24px; color: #6b7280; font-size: 11px; text-align: center; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        ${content}
+        <script>window.onload = function () { window.print(); };</script>
+      </body>
+    </html>`);
+  printWindow.document.close();
+};
 
 const Finance = () => {
-  const [students, setStudents] = useState(initialStudents);
-  const [transactions, setTransactions] = useState(initialTransactions);
-  const [searchQuery, setSearchQuery] = useState('');
-
-  // Form States: Search & Select Student
-  const [searchIdQuery, setSearchIdQuery] = useState('');
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [pendingSearch, setPendingSearch] = useState("");
+  const [transactionSearch, setTransactionSearch] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [receivedBy, setReceivedBy] = useState("");
+  const [remark, setRemark] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [editingPayment, setEditingPayment] = useState(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editMethod, setEditMethod] = useState("Cash");
+  const [editReceiver, setEditReceiver] = useState("");
+  const [editRemark, setEditRemark] = useState("");
+  const [updatingPayment, setUpdatingPayment] = useState(false);
 
-  // Form States: Financial & Meta Fields
-  const [totalAmount, setTotalAmount] = useState('');
-  const [payAmount, setPayAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Online UPI');
-  const [submittedTo, setSubmittedTo] = useState('');
-  const [remarkNotice, setRemarkNotice] = useState('');
+  useEffect(() => {
+    let active = true;
+    authService.getAllStudents()
+      .then((data) => {
+        if (active) setStudents(data.map(normalizeStudent));
+      })
+      .catch((error) => {
+        if (active) setLoadError(error.response?.data?.message || error.message || "Failed to load students.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-  // Search Results for Student ID / Name
-  const searchResults = useMemo(() => {
-    if (!searchIdQuery.trim()) return [];
-    const q = searchIdQuery.toLowerCase().trim();
-    return students.filter(
-      (s) => s.id.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
-    );
-  }, [searchIdQuery, students]);
-
-  // Handle Selecting a Student from dropdown
-  const handleSelectStudent = (student) => {
-    setSelectedStudent(student);
-    setSearchIdQuery(`${student.id} - ${student.name}`);
-    setTotalAmount(student.totalFee);
-    setPayAmount('');
-    setIsDropdownOpen(false);
-  };
-
-  // Auto calculate pending fees (Total - Pay)
-  const numericTotal = parseFloat(totalAmount) || 0;
-  const numericPay = parseFloat(payAmount) || 0;
-  const autoPendingFee = Math.max(0, numericTotal - numericPay);
-
-  // Handle Fee Form Submission
-  const handleFeeSubmit = (e) => {
-    e.preventDefault();
-    if (!selectedStudent) {
-      alert('Kripya student ID search karke student select karein.');
-      return;
-    }
-    if (numericPay <= 0) {
-      alert('Valid pay amount enter karein.');
-      return;
-    }
-    if (numericPay > numericTotal) {
-      alert('Pay amount total amount se jyada nahi ho sakta.');
-      return;
-    }
-    if (!submittedTo.trim()) {
-      alert('Kripya "Submitted To" (Staff/Receiver Name) enter karein.');
-      return;
-    }
-
-    // 1. Update Student's record
-    setStudents((prev) =>
-      prev.map((s) =>
-        s.id === selectedStudent.id
-          ? {
-              ...s,
-              totalFee: numericTotal,
-              paidFee: s.paidFee + numericPay,
-              pendingFee: autoPendingFee,
-            }
-          : s
-      )
-    );
-
-    // 2. Add New Transaction entry
-    const newTxn = {
-      txnId: `TXN-${Math.floor(1000 + Math.random() * 9000)}`,
-      studentName: selectedStudent.name,
-      studentId: selectedStudent.id,
-      course: selectedStudent.course,
-      totalAmount: numericTotal,
-      amountPaid: numericPay,
-      remainingBalance: autoPendingFee,
-      paymentMode: paymentMethod,
-      submittedTo: submittedTo.trim(),
-      remarkNotice: remarkNotice.trim() || 'N/A',
-      date: new Date().toISOString().split('T')[0],
-      status: 'Completed',
+    return () => {
+      active = false;
     };
+  }, []);
 
-    setTransactions([newTxn, ...transactions]);
+  const pendingStudents = useMemo(() => {
+    const query = pendingSearch.trim().toLowerCase();
+    return students.filter((student) => (
+      student.pendingFee > 0 &&
+      (!query || [
+        student.id,
+        student.application_number,
+        student.admission_number,
+        student.roll_number,
+        student.name,
+        student.course,
+      ].some((value) => String(value || "").toLowerCase().includes(query)))
+    ));
+  }, [pendingSearch, students]);
 
-    // Reset Form
-    setSelectedStudent(null);
-    setSearchIdQuery('');
-    setTotalAmount('');
-    setPayAmount('');
-    setSubmittedTo('');
-    setRemarkNotice('');
-    alert(`Fee of $${numericPay} successfully submitted for ${selectedStudent.name}!`);
+  const searchResults = useMemo(() => {
+    const query = studentSearch.trim().toLowerCase();
+    if (!query) return [];
+    return students.filter((student) => [
+      student.id,
+      student.application_number,
+      student.admission_number,
+      student.roll_number,
+      student.mongoId,
+      student.name,
+      student.course,
+    ].some((value) => String(value || "").toLowerCase().includes(query))).slice(0, 8);
+  }, [studentSearch, students]);
+
+  const transactions = useMemo(() => students.flatMap((student) => (
+    student.transactions.map((transaction, index) => ({
+      txnId: transaction.receipt_number || `${student.mongoId}-${index}`,
+      studentName: student.name,
+      studentId: student.id,
+      course: student.course,
+      totalAmount: Number(transaction.total_fee ?? student.totalFee) || 0,
+      amountPaid: Number(transaction.amount) || 0,
+      remainingBalance: Number(transaction.pending_amount ?? student.pendingFee) || 0,
+      paymentMode: transaction.payment_method || student.payment_method || "—",
+      submittedTo: transaction.received_by || "—",
+      remark: transaction.remark || "",
+      date: transaction.paid_at,
+      voided: Boolean(transaction.voided_at),
+    }))
+  )), [students]);
+
+  const filteredTransactions = useMemo(() => {
+    const query = transactionSearch.trim().toLowerCase();
+    return transactions
+      .filter((transaction) => !query || [
+        transaction.studentName,
+        transaction.studentId,
+        transaction.txnId,
+        transaction.course,
+        transaction.submittedTo,
+      ].some((value) => String(value || "").toLowerCase().includes(query)))
+      .sort((first, second) => new Date(second.date || 0) - new Date(first.date || 0));
+  }, [transactionSearch, transactions]);
+
+  const selectedTransactions = useMemo(() => {
+    if (!selectedStudent) return [];
+    return [...selectedStudent.transactions].sort(
+      (first, second) => new Date(second.paid_at || 0) - new Date(first.paid_at || 0)
+    );
+  }, [selectedStudent]);
+
+  const totalCollected = students.reduce((sum, student) => sum + student.paidFee, 0);
+  const totalPending = students.reduce((sum, student) => sum + student.pendingFee, 0);
+  const numericPay = Number(payAmount) || 0;
+  const remainingAfterPayment = Math.max(0, (selectedStudent?.pendingFee || 0) - numericPay);
+
+  const selectStudent = (student) => {
+    setSelectedStudent(student);
+    setStudentSearch(`${student.id} - ${student.name}`);
+    setPayAmount("");
+    setIsDropdownOpen(false);
+    setSubmitError("");
+    setSuccessMessage("");
   };
 
-  // 1. Download Individual Fee Slip (Print to PDF Receipt)
-  const handleDownloadSlip = (item) => {
-    const slipWindow = window.open('', '_blank', 'width=750,height=600');
-    if (!slipWindow) {
-      alert('Please allow popups to download/print the fee receipt.');
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!selectedStudent) {
+      setSubmitError("Please search and select a student first.");
+      return;
+    }
+    if (!Number.isFinite(numericPay) || numericPay <= 0 || numericPay > selectedStudent.pendingFee) {
+      setSubmitError("Payment must be greater than zero and cannot exceed the pending fee.");
+      return;
+    }
+    if (!receivedBy.trim()) {
+      setSubmitError("Please enter the name of the staff member receiving this payment.");
       return;
     }
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Fee Receipt - ${item.txnId}</title>
-          <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #1f2937; margin: 0; }
-            .receipt-box { border: 2px dashed #d1d5db; border-radius: 12px; padding: 30px; max-width: 620px; margin: auto; }
-            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #7c3aed; padding-bottom: 12px; margin-bottom: 20px; }
-            .header h2 { margin: 0; color: #7c3aed; }
-            .meta-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
-            .table-box { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            .table-box th, .table-box td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; }
-            .table-box th { background: #fbf6ec; }
-            .total-badge { font-size: 18px; font-weight: bold; color: #15803d; }
-            .notice-box { background: #faf6eb; border-left: 3px solid #7c3aed; padding: 8px 12px; font-size: 13px; margin-top: 14px; }
-            .footer-msg { text-align: center; margin-top: 25px; font-size: 13px; color: #6b7280; }
-          </style>
-        </head>
-        <body>
-          <div class="receipt-box">
-            <div class="header">
-              <div>
-                <h2>ACADEMIC INSTITUTE</h2>
-                <small>Official Student Fee Receipt</small>
-              </div>
-              <div style="text-align: right;">
-                <strong>Receipt #: ${item.txnId}</strong><br />
-                <small>Date: ${item.date}</small>
-              </div>
-            </div>
+    setSubmitting(true);
+    setSubmitError("");
+    setSuccessMessage("");
+    try {
+      const savedStudent = normalizeStudent(await authService.submitStudentFee(
+        selectedStudent.mongoId,
+        {
+          amount: numericPay,
+          payment_method: paymentMethod,
+          received_by: receivedBy.trim(),
+          remark: remark.trim(),
+        }
+      ));
 
-            <div class="meta-row">
-              <span><strong>Student:</strong> ${item.studentName}</span>
-              <span><strong>Student ID:</strong> ${item.studentId}</span>
-            </div>
-            <div class="meta-row">
-              <span><strong>Course:</strong> ${item.course}</span>
-              <span><strong>Payment Method:</strong> ${item.paymentMode}</span>
-            </div>
-            <div class="meta-row">
-              <span><strong>Submitted To:</strong> ${item.submittedTo || 'Admin Desk'}</span>
-            </div>
-
-            <table class="table-box">
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th style="text-align: right;">Amount ($)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Total Course Fee</td>
-                  <td style="text-align: right;">$${item.totalAmount || item.amountPaid + item.remainingBalance}.00</td>
-                </tr>
-                <tr>
-                  <td>Installment / Amount Paid Now</td>
-                  <td style="text-align: right; color: #15803d; font-weight: bold;">$${item.amountPaid}.00</td>
-                </tr>
-                <tr>
-                  <td><strong>Pending Due Balance</strong></td>
-                  <td style="text-align: right; color: #dc2626; font-weight: bold;">$${item.remainingBalance}.00</td>
-                </tr>
-              </tbody>
-            </table>
-
-            ${item.remarkNotice && item.remarkNotice !== 'N/A' ? `<div class="notice-box"><strong>Remark/Notice:</strong> ${item.remarkNotice}</div>` : ''}
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
-              <div>Status: <span style="color: #15803d; font-weight: bold;">PAID</span></div>
-              <div class="total-badge">Received: $${item.amountPaid}.00</div>
-            </div>
-
-            <div class="footer-msg">
-              <p>Thank you! This is an official digitally generated receipt.</p>
-            </div>
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `;
-
-    slipWindow.document.open();
-    slipWindow.document.write(htmlContent);
-    slipWindow.document.close();
+      setStudents((current) => current.map((student) => (
+        student.mongoId === savedStudent.mongoId ? savedStudent : student
+      )));
+      setSelectedStudent(savedStudent);
+      setPayAmount("");
+      setReceivedBy("");
+      setRemark("");
+      setSuccessMessage(`Payment recorded successfully. Receipt: ${savedStudent.transactions.at(-1)?.receipt_number || "ready"}.`);
+    } catch (error) {
+      setSubmitError(error.response?.data?.message || error.message || "Unable to submit the fee.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // 2. Download All Students Fees in Excel / CSV
-  const handleExportToExcel = () => {
-    const headers = ['Student ID', 'Student Name', 'Course', 'Total Fee ($)', 'Paid Fee ($)', 'Pending Fee ($)', 'Due Date'];
-    const rows = students.map((s) => [
-      s.id,
-      `"${s.name}"`,
-      `"${s.course}"`,
-      s.totalFee,
-      s.paidFee,
-      s.pendingFee,
-      s.lastDate,
-    ]);
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `All_Student_Fees_Details_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const startPaymentEdit = (payment) => {
+    setEditingPayment(payment);
+    setEditAmount(String(payment.amount));
+    setEditMethod(payment.payment_method || "Other");
+    setEditReceiver(payment.received_by || "");
+    setEditRemark(payment.remark || "");
+    setSubmitError("");
+    setSuccessMessage("");
   };
 
-  // Filter Transactions by Search
-  const filteredTxns = transactions.filter((t) => {
-    const q = searchQuery.toLowerCase().trim();
-    return (
-      q === '' ||
-      t.studentName.toLowerCase().includes(q) ||
-      t.studentId.toLowerCase().includes(q) ||
-      t.txnId.toLowerCase().includes(q) ||
-      t.course.toLowerCase().includes(q) ||
-      t.submittedTo.toLowerCase().includes(q)
+  const handlePaymentUpdate = async (event) => {
+    event.preventDefault();
+    if (!selectedStudent || !editingPayment) return;
+
+    const amount = Number(editAmount);
+    const maximumAmount = selectedStudent.pendingFee + Number(editingPayment.amount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > maximumAmount) {
+      setSubmitError(`Updated payment must be between ₹0.01 and ${formatMoney(maximumAmount)}.`);
+      return;
+    }
+    if (!editReceiver.trim()) {
+      setSubmitError("Please enter the name of the staff member who received this payment.");
+      return;
+    }
+
+    setUpdatingPayment(true);
+    setSubmitError("");
+    setSuccessMessage("");
+    try {
+      const savedStudent = normalizeStudent(await authService.updateStudentFeePayment(
+        selectedStudent.mongoId,
+        editingPayment.receipt_number,
+        {
+          amount,
+          payment_method: editMethod,
+          received_by: editReceiver.trim(),
+          remark: editRemark.trim(),
+        }
+      ));
+      setStudents((current) => current.map((student) => (
+        student.mongoId === savedStudent.mongoId ? savedStudent : student
+      )));
+      setSelectedStudent(savedStudent);
+      setEditingPayment(null);
+      setSuccessMessage(`Payment ${editingPayment.receipt_number} was updated.`);
+    } catch (error) {
+      setSubmitError(error.response?.data?.message || error.message || "Unable to update this payment.");
+    } finally {
+      setUpdatingPayment(false);
+    }
+  };
+
+  const handlePaymentReverse = async (payment) => {
+    if (!selectedStudent || payment.voided_at) return;
+    const confirmed = window.confirm(
+      `Reverse ${formatMoney(payment.amount)} payment ${payment.receipt_number} for ${selectedStudent.name}? The record will remain in history, and the amount will be restored to the student's pending fee.`
     );
-  });
+    if (!confirmed) return;
 
-  // Calculate totals for KPI
-  const totalPending = students.reduce((acc, curr) => acc + curr.pendingFee, 0);
-  const totalCollected = students.reduce((acc, curr) => acc + curr.paidFee, 0);
+    setSubmitError("");
+    setSuccessMessage("");
+    try {
+      const savedStudent = normalizeStudent(await authService.reverseStudentFeePayment(
+        selectedStudent.mongoId,
+        payment.receipt_number,
+        "Reversed by admin"
+      ));
+      setStudents((current) => current.map((student) => (
+        student.mongoId === savedStudent.mongoId ? savedStudent : student
+      )));
+      setSelectedStudent(savedStudent);
+      if (editingPayment?.receipt_number === payment.receipt_number) {
+        setEditingPayment(null);
+      }
+      setSuccessMessage(`Payment ${payment.receipt_number} was reversed. You can now submit it for the correct student.`);
+    } catch (error) {
+      setSubmitError(error.response?.data?.message || error.message || "Unable to reverse this payment.");
+    }
+  };
+
+  const downloadFeeListPdf = () => {
+    const rows = students.map((student) => `<tr>
+      <td>${escapeHtml(student.id)}</td>
+      <td>${escapeHtml(student.name)}</td>
+      <td>${escapeHtml(student.course)}</td>
+      <td class="amount">${escapeHtml(formatMoney(student.totalFee))}</td>
+      <td class="amount received">${escapeHtml(formatMoney(student.paidFee))}</td>
+      <td class="amount pending">${escapeHtml(formatMoney(student.pendingFee))}</td>
+      <td>${student.pendingFee > 0 ? "Pending" : "Paid"}</td>
+    </tr>`).join("");
+    openPdfWindow("Current Student Fee List", `
+      <h1>Current Student Fee List</h1>
+      <p class="subtitle">Generated ${escapeHtml(new Date().toLocaleString("en-IN"))}</p>
+      <div class="meta"><strong>Total collected: ${escapeHtml(formatMoney(totalCollected))}</strong>
+        <strong>Total pending: ${escapeHtml(formatMoney(totalPending))}</strong></div>
+      <table>
+        <thead><tr><th>Student ID</th><th>Student Name</th><th>Course</th><th class="amount">Total Fee</th>
+          <th class="amount">Paid</th><th class="amount">Pending</th><th>Status</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="7">No students found.</td></tr>'}</tbody>
+      </table>
+      <p class="footer">Current fee balances from the student database.</p>
+    `);
+  };
+
+  const downloadPaymentsPdf = () => {
+    const rows = filteredTransactions.map((transaction) => `<tr>
+      <td>${escapeHtml(transaction.txnId)}</td>
+      <td>${escapeHtml(transaction.studentId)}</td>
+      <td>${escapeHtml(transaction.studentName)}</td>
+      <td>${escapeHtml(transaction.course)}</td>
+      <td>${escapeHtml(formatDate(transaction.date))}</td>
+      <td>${escapeHtml(transaction.paymentMode)}</td>
+      <td class="amount received">${escapeHtml(formatMoney(transaction.amountPaid))}</td>
+      <td class="amount pending">${escapeHtml(formatMoney(transaction.remainingBalance))}</td>
+      <td>${escapeHtml(transaction.submittedTo)}</td>
+      <td>${transaction.voided ? "REVERSED" : "Active"}</td>
+    </tr>`).join("");
+    openPdfWindow("Submitted Fee Payments", `
+      <h1>Submitted Fee Payments</h1>
+      <p class="subtitle">Generated ${escapeHtml(new Date().toLocaleString("en-IN"))}${transactionSearch.trim() ? ` · Filter: ${escapeHtml(transactionSearch.trim())}` : ""}</p>
+      <table>
+        <thead><tr><th>Receipt</th><th>Student ID</th><th>Student</th><th>Course</th><th>Date</th>
+          <th>Method</th><th class="amount">Paid</th><th class="amount">Pending</th><th>Received by</th><th>Status</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="10">No fee payments found.</td></tr>'}</tbody>
+      </table>
+      <p class="footer">Saved student payment history.</p>
+    `);
+  };
+
+  const downloadStudentHistoryPdf = () => {
+    if (!selectedStudent) return;
+    const rows = selectedTransactions.map((transaction) => `<tr>
+      <td>${escapeHtml(transaction.receipt_number || "—")}</td>
+      <td>${escapeHtml(formatDate(transaction.paid_at))}</td>
+      <td>${escapeHtml(transaction.payment_method || "—")}</td>
+      <td>${escapeHtml(transaction.received_by || "—")}</td>
+      <td class="amount received">${escapeHtml(formatMoney(transaction.amount))}</td>
+      <td class="amount pending">${escapeHtml(formatMoney(transaction.pending_amount))}</td>
+      <td>${escapeHtml(transaction.remark || "—")}</td>
+    </tr>`).join("");
+    openPdfWindow(`Fee History - ${selectedStudent.id}`, `
+      <h1>Student Fee History</h1>
+      <p class="subtitle">${escapeHtml(selectedStudent.name)} · Student ID: ${escapeHtml(selectedStudent.id)}</p>
+      <div class="meta"><span>Course: ${escapeHtml(selectedStudent.course)}</span>
+        <span>Total fee: ${escapeHtml(formatMoney(selectedStudent.totalFee))}</span></div>
+      <div class="meta"><strong>Paid: ${escapeHtml(formatMoney(selectedStudent.paidFee))}</strong>
+        <strong>Pending: ${escapeHtml(formatMoney(selectedStudent.pendingFee))}</strong></div>
+      <table>
+        <thead><tr><th>Receipt</th><th>Date</th><th>Method</th><th>Received by</th>
+          <th class="amount">Paid</th><th class="amount">Pending</th><th>Remark</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="7">No fee payments recorded.</td></tr>'}</tbody>
+      </table>
+    `);
+  };
+
+  const downloadReceiptPdf = (transaction) => {
+    openPdfWindow(`Fee Receipt - ${transaction.txnId}`, `
+      <h1>Fee Payment Receipt</h1>
+      <p class="subtitle">Receipt: ${escapeHtml(transaction.txnId)} · ${escapeHtml(formatDate(transaction.date))}</p>
+      <div class="meta"><span><strong>Student:</strong> ${escapeHtml(transaction.studentName)}</span>
+        <span><strong>Student ID:</strong> ${escapeHtml(transaction.studentId)}</span></div>
+      <div class="meta"><span><strong>Course:</strong> ${escapeHtml(transaction.course)}</span>
+        <span><strong>Payment method:</strong> ${escapeHtml(transaction.paymentMode)}</span></div>
+      <div class="meta"><span><strong>Received by:</strong> ${escapeHtml(transaction.submittedTo)}</span></div>
+      <table>
+        <thead><tr><th>Description</th><th class="amount">Amount</th></tr></thead>
+        <tbody>
+          <tr><td>Total course fee</td><td class="amount">${escapeHtml(formatMoney(transaction.totalAmount))}</td></tr>
+          <tr><td>Paid now</td><td class="amount received">${escapeHtml(formatMoney(transaction.amountPaid))}</td></tr>
+          <tr><td>Pending balance</td><td class="amount pending">${escapeHtml(formatMoney(transaction.remainingBalance))}</td></tr>
+          ${transaction.remark ? `<tr><td>Remark</td><td>${escapeHtml(transaction.remark)}</td></tr>` : ""}
+        </tbody>
+      </table>
+      <p class="footer">Thank you. This is a digitally generated fee receipt.</p>
+    `);
+  };
 
   return (
     <div className="finance-container">
-      {/* Top Bar with Excel Export */}
       <div className="finance-top-bar">
         <div>
-          <h2 className="finance-heading">Finance & Fee Management</h2>
-          <p className="finance-sub">Search students by ID, record payments, auto-calculate pending dues, and print receipts</p>
+          <h2 className="finance-heading">Finance &amp; Fee Management</h2>
+          <p className="finance-sub">Submit student fees, track payment history, and download PDF reports</p>
         </div>
-
-        <button className="excel-export-btn" onClick={handleExportToExcel}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+        <button className="excel-export-btn" type="button" onClick={downloadFeeListPdf}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-          <span>Download All Fees (Excel)</span>
+          <span>Download Current Fee List (PDF)</span>
         </button>
       </div>
 
-      {/* KPI Cards */}
+      {loadError && <div className="finance-message error" role="alert">{loadError}</div>}
+
       <div className="finance-stats-grid">
         <div className="f-card total-paid">
           <span className="f-label">Total Fees Collected</span>
-          <h3 className="f-val">${totalCollected.toLocaleString()}</h3>
-          <span className="f-badge success">+15.8% collected this month</span>
+          <h3 className="f-val">{formatMoney(totalCollected)}</h3>
+          <span className="f-badge success">Collected from student records</span>
         </div>
-
         <div className="f-card total-pending">
           <span className="f-label">Total Fees Pending</span>
-          <h3 className="f-val">${totalPending.toLocaleString()}</h3>
-          <span className="f-badge alert">Action required</span>
+          <h3 className="f-val">{formatMoney(totalPending)}</h3>
+          <span className="f-badge alert">Across all enrolled students</span>
         </div>
-
         <div className="f-card pending-students">
           <span className="f-label">Students with Pending Dues</span>
-          <h3 className="f-val">{students.filter((s) => s.pendingFee > 0).length}</h3>
+          <h3 className="f-val">{students.filter((student) => student.pendingFee > 0).length}</h3>
           <span className="f-badge gray">Out of {students.length} enrolled students</span>
         </div>
       </div>
 
-      {/* Main Action Grid: Integrated Fee Form + Pending Dues Watchlist */}
       <div className="finance-action-grid">
-        {/* Integrated Fee Submission Form */}
         <div className="form-panel-card">
           <div className="form-title-group">
             <h3 className="panel-heading">Submit Student Fee</h3>
-            <p className="panel-subtext">Search by Student ID, auto-compute pending dues & record deposit</p>
+            <p className="panel-subtext">Select a student and record a payment to update the database</p>
           </div>
 
-          <form onSubmit={handleFeeSubmit} className="fee-form">
-            {/* 1. Student ID Autocomplete Search */}
+          <form onSubmit={handleSubmit} className="fee-form">
             <div className="form-group autocomplete-group">
-              <label>Search & Select Student (By ID / Name)</label>
+              <label htmlFor="finance-student-search">Search &amp; Select Student (ID / Name)</label>
               <div className="search-input-wrapper">
-                <svg className="search-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg className="search-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
                 <input
+                  id="finance-student-search"
                   type="text"
-                  placeholder="Type ID (e.g. STU-1001) or Name..."
-                  value={searchIdQuery}
-                  onChange={(e) => {
-                    setSearchIdQuery(e.target.value);
+                  placeholder="Type application, admission, roll ID or name"
+                  value={studentSearch}
+                  onChange={(event) => {
+                    setStudentSearch(event.target.value);
+                    setSelectedStudent(null);
                     setIsDropdownOpen(true);
-                    if (selectedStudent) setSelectedStudent(null);
+                    setSuccessMessage("");
                   }}
                   onFocus={() => setIsDropdownOpen(true)}
-                  required
+                  autoComplete="off"
                 />
                 {selectedStudent && (
                   <button
                     type="button"
                     className="clear-student-btn"
+                    aria-label="Clear selected student"
                     onClick={() => {
                       setSelectedStudent(null);
-                      setSearchIdQuery('');
-                      setTotalAmount('');
-                      setPayAmount('');
+                      setStudentSearch("");
+                      setPayAmount("");
                     }}
                   >
-                    ✕
+                    ×
                   </button>
                 )}
               </div>
-
-              {/* Autocomplete Dropdown List */}
               {isDropdownOpen && searchResults.length > 0 && (
                 <ul className="student-dropdown-results">
-                  {searchResults.map((item) => (
-                    <li key={item.id} onClick={() => handleSelectStudent(item)}>
-                      <span className="stu-id-tag">{item.id}</span>
+                  {searchResults.map((student) => (
+                    <li key={student.mongoId} onMouseDown={() => selectStudent(student)}>
+                      <span className="stu-id-tag">{student.id}</span>
                       <div className="stu-info-col">
-                        <strong>{item.name}</strong>
-                        <small>{item.course}</small>
+                        <strong>{student.name}</strong>
+                        <small>{student.course} · Pending {formatMoney(student.pendingFee)}</small>
                       </div>
-                      <span className="stu-fee-tag">${item.totalFee}</span>
+                      <span className="stu-fee-tag">{formatMoney(student.totalFee)}</span>
                     </li>
                   ))}
                 </ul>
               )}
-
-              {isDropdownOpen && searchIdQuery.trim() && searchResults.length === 0 && !selectedStudent && (
-                <div className="no-result-dropdown">Koi student nahi mila "{searchIdQuery}" ID se</div>
+              {isDropdownOpen && studentSearch.trim() && searchResults.length === 0 && !loading && (
+                <div className="no-result-dropdown">No students found for “{studentSearch}”</div>
               )}
             </div>
 
-            {/* Selected Student Meta Information */}
             {selectedStudent && (
-              <div className="selected-meta-box">
-                <div><span>Course:</span> <strong>{selectedStudent.course}</strong></div>
-                <div><span>Previous Paid:</span> <strong>${selectedStudent.paidFee}</strong></div>
-                <div><span>Existing Due:</span> <strong className="due-text">${selectedStudent.pendingFee}</strong></div>
-              </div>
+              <>
+                <div className="selected-meta-box">
+                  <div><span>Student:</span> <strong>{selectedStudent.name}</strong></div>
+                  <div><span>Student ID:</span> <strong>{selectedStudent.id}</strong></div>
+                  <div><span>Course:</span> <strong>{selectedStudent.course}</strong></div>
+                  <div><span>Total fee:</span> <strong>{formatMoney(selectedStudent.totalFee)}</strong></div>
+                  <div><span>Previously paid:</span> <strong>{formatMoney(selectedStudent.paidFee)}</strong></div>
+                  <div><span>Current due:</span> <strong className="due-text">{formatMoney(selectedStudent.pendingFee)}</strong></div>
+                  {selectedStudent.academic_session && (
+                    <div><span>Session:</span> <strong>{selectedStudent.academic_session}</strong></div>
+                  )}
+                  {selectedStudent.phone_number && (
+                    <div><span>Phone:</span> <strong>{selectedStudent.phone_number}</strong></div>
+                  )}
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="fee-amount">Payment Amount (₹)</label>
+                    <input
+                      id="fee-amount"
+                      type="number"
+                      min="0.01"
+                      max={selectedStudent.pendingFee}
+                      step="0.01"
+                      placeholder="Enter amount"
+                      value={payAmount}
+                      onChange={(event) => setPayAmount(event.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="fee-method">Payment Method</label>
+                    <select id="fee-method" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}>
+                      <option value="Cash">Cash</option>
+                      <option value="UPI">UPI</option>
+                      <option value="Card">Card</option>
+                      <option value="Bank Transfer">Bank Transfer</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Pending After This Payment</label>
+                  <div className={`pending-display-box ${remainingAfterPayment > 0 ? "has-due" : "cleared"}`}>
+                    <span className="currency-sign">₹</span>
+                    <span className="pending-value">{remainingAfterPayment.toFixed(2)}</span>
+                    <span className="pending-status-pill">{remainingAfterPayment > 0 ? "Due Balance" : "Fully Paid"}</span>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="fee-receiver">Received By</label>
+                  <input
+                    id="fee-receiver"
+                    type="text"
+                    maxLength="100"
+                    placeholder="Staff / receiver name"
+                    value={receivedBy}
+                    onChange={(event) => setReceivedBy(event.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="fee-remark">Remark (optional)</label>
+                  <textarea
+                    id="fee-remark"
+                    rows="2"
+                    maxLength="500"
+                    placeholder="Payment note"
+                    value={remark}
+                    onChange={(event) => setRemark(event.target.value)}
+                  />
+                </div>
+              </>
             )}
 
-            {/* 2. Total Amount & Pay Amount */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>Total Amount ($)</label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="e.g. 1500"
-                  value={totalAmount}
-                  onChange={(e) => setTotalAmount(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Pay Amount ($)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max={numericTotal || undefined}
-                  placeholder="e.g. 500"
-                  value={payAmount}
-                  onChange={(e) => setPayAmount(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* 3. Auto Pending Fees (Total - Pay) & Payment Method */}
-            <div className="form-row">
-              <div className="form-group">
-                <label>Auto Pending Fees (Total - Pay)</label>
-                <div className={`pending-display-box ${autoPendingFee > 0 ? 'has-due' : 'cleared'}`}>
-                  <span className="currency-sign">$</span>
-                  <span className="pending-value">{autoPendingFee.toFixed(2)}</span>
-                  <span className="pending-status-pill">
-                    {autoPendingFee === 0 && numericTotal > 0 ? 'Full Paid' : 'Due Balance'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Payment Method</label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                >
-                  <option value="Online UPI">Online UPI / GPay / PhonePe</option>
-                  <option value="Net Banking">Net Banking</option>
-                  <option value="Card Payment">Debit / Credit Card</option>
-                  <option value="Cash">Cash Deposit</option>
-                  <option value="Cheque">Bank Cheque</option>
-                </select>
-              </div>
-            </div>
-
-            {/* 4. Submitted To (Receiver/Staff Name) */}
-            <div className="form-group">
-              <label>Submitted To (Staff / Receiver Name)</label>
-              <input
-                type="text"
-                placeholder="e.g. Accounts Desk (Mr. Sharma)"
-                value={submittedTo}
-                onChange={(e) => setSubmittedTo(e.target.value)}
-                required
-              />
-            </div>
-
-            {/* 5. Remark / Notice */}
-            <div className="form-group">
-              <label>Remark / Notice</label>
-              <textarea
-                rows="2"
-                placeholder="e.g. 1st installment clear. Remaining balance due on next month 20th."
-                value={remarkNotice}
-                onChange={(e) => setRemarkNotice(e.target.value)}
-              ></textarea>
-            </div>
-
-            {/* Submit Button */}
+            {submitError && <div className="finance-message error" role="alert">{submitError}</div>}
+            {successMessage && <div className="finance-message success" role="status">{successMessage}</div>}
             <button
               type="submit"
               className="submit-fee-btn"
-              disabled={!selectedStudent || numericPay <= 0}
+              disabled={!selectedStudent || numericPay <= 0 || numericPay > selectedStudent.pendingFee || submitting}
             >
-              Record Fee & Generate Receipt
+              {submitting ? "Saving Payment..." : "Submit Fee & Generate Receipt"}
             </button>
           </form>
+
+          {selectedStudent && (
+            <div className="student-fee-history">
+              <div className="fee-history-header">
+                <div>
+                  <h4 className="panel-heading">Fee Payment History</h4>
+                  <p className="panel-subtext">{selectedTransactions.length} saved payment(s)</p>
+                </div>
+                <button type="button" className="download-slip-btn" onClick={downloadStudentHistoryPdf}>
+                  Download History PDF
+                </button>
+              </div>
+              <div className="table-responsive">
+                {editingPayment && (
+                  <form className="edit-fee-payment-form" onSubmit={handlePaymentUpdate}>
+                    <div className="fee-history-header">
+                      <div>
+                        <h4 className="panel-heading">Edit Payment {editingPayment.receipt_number}</h4>
+                        <p className="panel-subtext">Amount can be raised only up to the student's remaining fee.</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="download-slip-btn"
+                        onClick={() => setEditingPayment(null)}
+                        disabled={updatingPayment}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label htmlFor="edit-fee-amount">Payment Amount (₹)</label>
+                        <input
+                          id="edit-fee-amount"
+                          type="number"
+                          min="0.01"
+                          max={selectedStudent.pendingFee + Number(editingPayment.amount)}
+                          step="0.01"
+                          value={editAmount}
+                          onChange={(event) => setEditAmount(event.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="edit-fee-method">Payment Method</label>
+                        <select id="edit-fee-method" value={editMethod} onChange={(event) => setEditMethod(event.target.value)}>
+                          <option value="Cash">Cash</option>
+                          <option value="UPI">UPI</option>
+                          <option value="Card">Card</option>
+                          <option value="Bank Transfer">Bank Transfer</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label htmlFor="edit-fee-receiver">Received By</label>
+                        <input
+                          id="edit-fee-receiver"
+                          type="text"
+                          maxLength="100"
+                          value={editReceiver}
+                          onChange={(event) => setEditReceiver(event.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="edit-fee-remark">Remark</label>
+                        <input
+                          id="edit-fee-remark"
+                          type="text"
+                          maxLength="500"
+                          value={editRemark}
+                          onChange={(event) => setEditRemark(event.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <button className="submit-fee-btn" type="submit" disabled={updatingPayment}>
+                      {updatingPayment ? "Updating Payment..." : "Save Payment Correction"}
+                    </button>
+                  </form>
+                )}
+                <table className="finance-table">
+                  <thead><tr><th>Receipt</th><th>Date</th><th>Paid</th><th>Pending</th><th>Method</th><th>Status / Correction</th></tr></thead>
+                  <tbody>
+                    {selectedTransactions.length ? selectedTransactions.map((payment, index) => (
+                      <tr key={payment.receipt_number || `${payment.paid_at}-${index}`}>
+                        <td className="tx-id-cell">{payment.receipt_number || "—"}</td>
+                        <td>{formatDate(payment.paid_at)}</td>
+                        <td className={payment.voided_at ? "amount-remain-cell" : "amount-paid-cell"}>{formatMoney(payment.amount)}</td>
+                        <td className="amount-remain-cell">{formatMoney(payment.pending_amount)}</td>
+                        <td><span className="pay-mode-pill">{payment.payment_method || "—"}</span></td>
+                        <td>
+                          {payment.voided_at ? (
+                            <span className="payment-voided-badge">Reversed</span>
+                          ) : (
+                            <div className="payment-correction-actions">
+                              <button
+                                type="button"
+                                className="edit-payment-btn"
+                                onClick={() => startPaymentEdit(payment)}
+                                disabled={!payment.receipt_number}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="reverse-payment-btn"
+                                onClick={() => handlePaymentReverse(payment)}
+                                disabled={!payment.receipt_number}
+                              >
+                                Reverse
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan="6" className="no-tx-data">No fee payments have been recorded for this student.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Student Pending Fee Tracker */}
         <div className="pending-table-panel">
-          <h3 className="panel-heading">Pending Dues Watchlist</h3>
-          <p className="panel-subtext">Students with outstanding fees</p>
-
+          <h3 className="panel-heading">Pending Students</h3>
+          <p className="panel-subtext">Search by student ID or name, then click to select for payment</p>
+          <div className="pending-search-box">
+            <input
+              type="search"
+              aria-label="Search students with pending fees"
+              placeholder="Search pending student ID or name"
+              value={pendingSearch}
+              onChange={(event) => setPendingSearch(event.target.value)}
+            />
+          </div>
           <div className="pending-list">
-            {students.filter((s) => s.pendingFee > 0).map((s) => (
-              <div key={s.id} className="pending-item">
-                <div className="pending-info">
-                  <strong>{s.name}</strong>
-                  <small>{s.course} • <span className="mono-id">{s.id}</span></small>
-                </div>
-                <div className="pending-amount">
-                  <span className="due-badge">${s.pendingFee} Pending</span>
-                  <small>Due by: {s.lastDate}</small>
-                </div>
-              </div>
+            {loading ? <p className="no-pending-students">Loading students...</p> : null}
+            {!loading && pendingStudents.map((student) => (
+              <button
+                type="button"
+                key={student.mongoId}
+                className={`pending-item pending-item-button ${selectedStudent?.mongoId === student.mongoId ? "selected" : ""}`}
+                onClick={() => selectStudent(student)}
+              >
+                <span className="pending-info">
+                  <strong>{student.name}</strong>
+                  <small>{student.course} · <span className="mono-id">{student.id}</span></small>
+                </span>
+                <span className="pending-amount">
+                  <span className="due-badge">{formatMoney(student.pendingFee)} Due</span>
+                  <small>Click to submit</small>
+                </span>
+              </button>
             ))}
+            {!loading && !pendingStudents.length && (
+              <p className="no-pending-students">
+                {pendingSearch ? "No pending students match your search." : "No students have pending fees."}
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Recent Transactions Table with PDF Slip Download */}
       <div className="recent-transactions-card">
         <div className="card-top-header">
           <div>
-            <h3 className="panel-heading">Recent Submitted Fees & Slips</h3>
-            <p className="panel-subtext">Download individual fee receipts in PDF</p>
+            <h3 className="panel-heading">Submitted Fee Payments</h3>
+            <p className="panel-subtext">Payment history saved in the student database · Print receipts as PDF</p>
           </div>
-
           <div className="txn-search-box">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
-              type="text"
-              placeholder="Search by student, ID, receipt, receiver..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              type="search"
+              aria-label="Search fee payments"
+              placeholder="Search by student, ID, receipt..."
+              value={transactionSearch}
+              onChange={(event) => setTransactionSearch(event.target.value)}
             />
           </div>
+          <button type="button" className="download-slip-btn" onClick={downloadPaymentsPdf}>
+            Download Payments PDF
+          </button>
         </div>
-
         <div className="table-responsive">
           <table className="finance-table">
             <thead>
-              <tr>
-                <th>Receipt ID</th>
-                <th>Student</th>
-                <th>Course</th>
-                <th>Paid Amount</th>
-                <th>Pending Due</th>
-                <th>Payment Mode</th>
-                <th>Submitted To</th>
-                <th>Date</th>
-                <th style={{ textAlign: 'right' }}>Slip / PDF</th>
-              </tr>
+              <tr><th>Receipt ID</th><th>Student</th><th>Course</th><th>Paid Amount</th><th>Pending Due</th><th>Payment Mode</th><th>Received By</th><th>Date</th><th style={{ textAlign: "right" }}>Receipt</th></tr>
             </thead>
             <tbody>
-              {filteredTxns.length > 0 ? (
-                filteredTxns.map((t) => (
-                  <tr key={t.txnId}>
-                    <td className="tx-id-cell">{t.txnId}</td>
-                    <td>
-                      <div className="tx-student-meta">
-                        <strong>{t.studentName}</strong>
-                        <small className="mono-id">{t.studentId}</small>
-                      </div>
-                    </td>
-                    <td>{t.course}</td>
-                    <td className="amount-paid-cell">+${t.amountPaid}</td>
-                    <td className="amount-remain-cell">${t.remainingBalance}</td>
-                    <td>
-                      <span className="pay-mode-pill">{t.paymentMode}</span>
-                    </td>
-                    <td className="submitted-to-cell">{t.submittedTo}</td>
-                    <td>{t.date}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <button
-                        className="download-slip-btn"
-                        onClick={() => handleDownloadSlip(t)}
-                        title="Print / Save PDF Receipt"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="6 9 6 2 18 2 18 9" />
-                          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                          <rect width="12" height="8" x="6" y="14" />
-                        </svg>
-                        <span>PDF Slip</span>
+              {filteredTransactions.length ? filteredTransactions.map((transaction) => (
+                <tr key={transaction.txnId}>
+                  <td className="tx-id-cell">{transaction.txnId}</td>
+                  <td><div className="tx-student-meta"><strong>{transaction.studentName}</strong><small className="mono-id">{transaction.studentId}</small></div></td>
+                  <td>{transaction.course}</td>
+                  <td className={transaction.voided ? "amount-remain-cell" : "amount-paid-cell"}>
+                    {transaction.voided ? "Reversed " : "+"}{formatMoney(transaction.amountPaid)}
+                  </td>
+                  <td className="amount-remain-cell">{formatMoney(transaction.remainingBalance)}</td>
+                  <td><span className="pay-mode-pill">{transaction.paymentMode}</span></td>
+                  <td className="submitted-to-cell">{transaction.submittedTo}</td>
+                  <td>{formatDate(transaction.date)}</td>
+                  <td style={{ textAlign: "right" }}>
+                    {transaction.voided ? (
+                      <span className="payment-voided-badge">Reversed</span>
+                    ) : (
+                      <button className="download-slip-btn" type="button" onClick={() => downloadReceiptPdf(transaction)} title="Print or save PDF receipt">
+                        PDF Slip
                       </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="9" className="no-tx-data">
-                    No transactions found matching "{searchQuery}"
+                    )}
                   </td>
                 </tr>
+              )) : (
+                <tr><td colSpan="9" className="no-tx-data">
+                  {loading ? "Loading payment history..." : transactionSearch ? "No payments match your search." : "No fee payments have been recorded yet."}
+                </td></tr>
               )}
             </tbody>
           </table>

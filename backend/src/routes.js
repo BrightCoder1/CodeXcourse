@@ -20,6 +20,7 @@ const {
   getStudentCount,
   getRecentStudents,
   getStudentById,
+  submitStudentFee,
   updateStudent,
   deleteStudent
 } = require("./controllers/Student.controller.js");
@@ -53,6 +54,7 @@ router.get('/student', adminAuth, getAllStudents);
 router.get('/student/count', adminAuth, getStudentCount);
 router.get('/student/recent', adminAuth, getRecentStudents);
 router.get('/student/:id', adminAuth, getStudentById);
+router.post('/student/:id/fee-payments', adminAuth, submitStudentFee);
 router.put('/student/:id', adminAuth, updateStudent);
 router.delete('/student/:id', adminAuth, deleteStudent);
 

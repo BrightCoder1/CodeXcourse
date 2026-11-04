@@ -190,7 +190,7 @@ export default function Navbar() {
         </nav>
 
         {/* Bottom Footer Section */}
-        <div className="sidebar-footer">
+        {/* <div className="sidebar-footer">
           <Link
             to="/settings"
             className={`nav-item ${location.pathname === '/settings' ? 'active' : ''}`}
@@ -201,7 +201,7 @@ export default function Navbar() {
             </span>
             <span className="nav-label">Settings</span>
           </Link>
-        </div>
+        </div> */}
       </aside>
     </>
   );

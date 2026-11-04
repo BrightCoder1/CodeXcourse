@@ -89,6 +89,14 @@ const authService = {
     return response.data.data;
   },
 
+  submitStudentFee: async (studentId, payment) => {
+    const response = await API.post(`/student/${studentId}/fee-payments`, payment);
+    if (!response.data.success || !response.data.data?._id) {
+      throw new Error(response.data.message || "The server returned an invalid payment response.");
+    }
+    return response.data.data;
+  },
+
   getRecentStudents: async () => {
     const response = await getOnce("/student/recent");
     if (!Array.isArray(response.data.data)) {
