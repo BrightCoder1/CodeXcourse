@@ -1,0 +1,252 @@
+html[data-theme="dark"] {
+  color-scheme: dark;
+  background: #0b1220;
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] #root {
+  min-height: 100%;
+  background: #0b1220;
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] :is(
+  .home-container,
+  .about-section,
+  .course-section,
+  .contact-section,
+  .blog-section,
+  .login-container,
+  .register-container,
+  .not-found
+) {
+  background-color: #0b1220;
+  background-image: none;
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] :is(
+  .hero-title,
+  .hero-description,
+  .hero-stats .stat-item h3,
+  .hero-stats .stat-item p,
+  .about-title,
+  .about-subtitle,
+  .story-header h3,
+  .story-card p,
+  .point-item,
+  .story-author h4,
+  .story-author p,
+  .pillar-text h4,
+  .pillar-text p,
+  .metric-box h3,
+  .metric-box p,
+  .course-title,
+  .course-subtitle,
+  .card-title,
+  .card-desc,
+  .course-level,
+  .duration-box,
+  .rating-box strong,
+  .rating-box .reviews,
+  .course-cta-banner h3,
+  .course-cta-banner p,
+  .contact-title,
+  .contact-subtitle,
+  .info-intro h3,
+  .info-intro p,
+  .contact-card h4,
+  .contact-card p,
+  .contact-card span,
+  .trust-card strong,
+  .trust-card p,
+  .form-head h3,
+  .form-head p,
+  .inquiry-group label,
+  .input-group label,
+  .form-success h3,
+  .form-success p,
+  .blog-title,
+  .blog-subtitle,
+  .card-meta,
+  .card-heading,
+  .card-excerpt,
+  .author-box strong,
+  .author-box p,
+  .newsletter-text h3,
+  .newsletter-text p,
+  .modal-body h2,
+  .modal-text,
+  .footer-tagline,
+  .footer-links-col h4,
+  .footer-links-col a,
+  .copyright-text,
+  .login-header h1,
+  .login-header p,
+  .input-group label,
+  .remember,
+  .register-link p,
+  .register-header h1,
+  .register-header p,
+  .login-link p,
+  .not-found h2,
+  .not-found p
+) {
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] :is(
+  .floating-badge,
+  .track-chip,
+  .btn-outline,
+  .story-card,
+  .story-points,
+  .pillar-card,
+  .about-metrics,
+  .filter-btn,
+  .course-card,
+  .course-message,
+  .course-cta-banner,
+  .contact-card,
+  .trust-card,
+  .contact-form-card,
+  .pill-btn,
+  .blog-card,
+  .blog-newsletter,
+  .modal-content,
+  .register-box,
+  .login-box
+) {
+  background-color: #172033;
+  border-color: #334155;
+  color: #e2e8f0;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+
+html[data-theme="dark"] :is(
+  .badge-icon,
+  .pillar-icon-box,
+  .card-icon,
+  .story-points,
+  .skill-pill,
+  .duration-box,
+  .trust-card,
+  .pill-btn,
+  .filter-btn:hover,
+  .track-chip:hover,
+  .newsletter-form input,
+  .input-group input,
+  .input-group textarea,
+  .register-box .input-group input
+) {
+  background-color: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] :is(
+  .hero-stats,
+  .story-author,
+  .metric-sep,
+  .card-meta,
+  .card-footer,
+  .register-link,
+  .footer-bottom
+) {
+  border-color: #334155;
+}
+
+html[data-theme="dark"] :is(.stat-divider, .metric-sep) {
+  background-color: #334155;
+}
+
+html[data-theme="dark"] :is(.tagline-badge, .about-badge, .course-badge, .contact-badge, .blog-badge) {
+  background-color: #202b46;
+  border-color: #3b4b73;
+  color: #c7d2fe;
+}
+
+html[data-theme="dark"] :is(
+  .login-box,
+  .register-box,
+  .contact-form-card,
+  .newsletter-form input,
+  .input-group input,
+  .input-group textarea
+) {
+  color: #f1f5f9;
+}
+
+html[data-theme="dark"] :is(
+  .input-group input,
+  .input-group textarea,
+  .newsletter-form input
+)::placeholder {
+  color: #94a3b8;
+}
+
+html[data-theme="dark"] .footer-section {
+  background-color: #080d17;
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] .footer-logo-img {
+  border-radius: 12px;
+}
+
+html[data-theme="dark"] .footer-links-col a:hover {
+  color: #93c5fd;
+}
+
+html[data-theme="dark"] .course-cta-banner .counseling-btn {
+  background-color: #2563eb;
+}
+
+html[data-theme="dark"] .card-category-badge {
+  background-color: rgba(15, 23, 42, 0.94);
+  color: #93c5fd;
+}
+
+html[data-theme="dark"] .modal-close-btn {
+  background-color: #1e293b;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] .login-container {
+  --bg-gradient-start: #0b1220;
+  --bg-gradient-end: #111827;
+  --card-bg: #172033;
+  --text-main: #e2e8f0;
+  --text-muted: #9ca3af;
+  --border-color: #334155;
+}
+
+html[data-theme="dark"] .register-container {
+  background-image: linear-gradient(135deg, #0b1220, #111827);
+}
+
+html[data-theme="dark"] .register-box .input-group input:focus,
+html[data-theme="dark"] .input-group input:focus,
+html[data-theme="dark"] .input-group textarea:focus,
+html[data-theme="dark"] .newsletter-form input:focus {
+  background-color: #111827;
+}
+
+html[data-theme="dark"] .scroll-btn {
+  background-color: #2563eb;
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme] body,
+  html[data-theme] .navbar,
+  html[data-theme] .nav-links,
+  html[data-theme] .home-container,
+  html[data-theme] .about-section,
+  html[data-theme] .course-section,
+  html[data-theme] .contact-section,
+  html[data-theme] .blog-section {
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+}

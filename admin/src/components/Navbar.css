@@ -142,6 +142,39 @@
   border-top: 1px solid rgba(0, 0, 0, 0.05);
 }
 
+html[data-theme="dark"] .sidebar,
+html[data-theme="dark"] .mobile-topbar {
+  background-color: #111827;
+  border-color: #374151;
+}
+
+html[data-theme="dark"] .brand-title,
+html[data-theme="dark"] .mobile-toggle-btn,
+html[data-theme="dark"] .mobile-close-btn {
+  color: #f3f4f6;
+}
+
+html[data-theme="dark"] .nav-item {
+  color: #d1d5db;
+}
+
+html[data-theme="dark"] .nav-item:hover {
+  background-color: #1f2937;
+}
+
+html[data-theme="dark"] .nav-item.active {
+  background-color: #6d28d9;
+  color: #fff;
+}
+
+html[data-theme="dark"] .desktop-collapse-btn {
+  border-color: #111827;
+}
+
+html[data-theme="dark"] .sidebar-footer {
+  border-top-color: #374151;
+}
+
 /* ====================================================
    Collapsed Mode Adjustments & Tooltips (PC / Laptop)
 ==================================================== */

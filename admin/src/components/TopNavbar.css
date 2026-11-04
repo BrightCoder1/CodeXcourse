@@ -63,6 +63,26 @@
   gap: 20px;
 }
 
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #d6cbb9;
+  border-radius: 9px;
+  background: transparent;
+  color: #1f1e24;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.theme-toggle-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
 /* Action Icon Buttons */
 .icon-btn {
   position: relative;
@@ -96,9 +116,6 @@
 
 /* --- Profile Section --- */
 .profile-wrapper {
-  background-color: #e7ded0;
-  border-radius: 16px;
-  padding: 6px 9px;
   position: relative;
   margin-left: 6px;
 }
@@ -183,6 +200,50 @@
 .logout-btn {
   color: #e54d42;
   font-weight: 500;
+}
+
+html[data-theme="dark"] .top-navbar {
+  background-color: #111827;
+  border-bottom-color: #374151;
+}
+
+html[data-theme="dark"] .theme-toggle-btn,
+html[data-theme="dark"] .profile-btn {
+  color: #e5e7eb;
+}
+
+html[data-theme="dark"] .theme-toggle-btn {
+  border-color: #4b5563;
+}
+
+html[data-theme="dark"] .theme-toggle-btn:hover,
+html[data-theme="dark"] .profile-btn:hover {
+  background-color: #374151;
+}
+
+html[data-theme="dark"] .profile-wrapper {
+  background-color: #1f2937;
+}
+
+html[data-theme="dark"] .profile-name {
+  color: #f9fafb;
+}
+
+html[data-theme="dark"] .profile-dropdown {
+  background-color: #1f2937;
+  border-color: #4b5563;
+}
+
+html[data-theme="dark"] .dropdown-item {
+  color: #e5e7eb;
+}
+
+html[data-theme="dark"] .dropdown-item:hover {
+  background-color: #374151;
+}
+
+html[data-theme="dark"] .dropdown-divider {
+  background-color: #4b5563;
 }
 
 /* =========================================

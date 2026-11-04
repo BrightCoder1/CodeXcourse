@@ -1,11 +1,26 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import "./Navbar.css";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(
+    () => localStorage.getItem("admin_theme") === "dark"
+  );
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = isDarkMode ? "dark" : "light";
+  }, [isDarkMode]);
+
+  const toggleTheme = () => {
+    setIsDarkMode((darkMode) => {
+      const nextMode = !darkMode;
+      localStorage.setItem("admin_theme", nextMode ? "dark" : "light");
+      return nextMode;
+    });
+  };
 
   const toggleMenu = () => {
     setIsOpen(!isOpen);
@@ -80,6 +95,27 @@ function Navbar() {
             <a href="/" onClick={(e) => handleNavClick(e, "blog")}>
               Blog
             </a>
+          </li>
+
+          <li>
+            <button
+              type="button"
+              className="theme-toggle"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
+              aria-pressed={isDarkMode}
+            >
+              {isDarkMode ? (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />
+                </svg>
+              )}
+            </button>
           </li>
 
           {/* Login Route */}

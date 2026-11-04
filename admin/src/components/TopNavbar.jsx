@@ -1,9 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './TopNavbar.css';
 
 const Icons = {
+    Moon: () => (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />
+        </svg>
+    ),
+    Sun: () => (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
+        </svg>
+    ),
     Bell: () => (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -26,9 +37,24 @@ const Icons = {
 
 export default function TopNavbar() {
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [isDarkMode, setIsDarkMode] = useState(
+        () => localStorage.getItem('admin_theme') === 'dark'
+    );
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const displayName = user?.emp_name?.trim() || user?.name?.trim() || user?.email || 'Admin';
+
+    useEffect(() => {
+        document.documentElement.dataset.theme = isDarkMode ? 'dark' : 'light';
+    }, [isDarkMode]);
+
+    const handleThemeToggle = () => {
+        setIsDarkMode((darkMode) => {
+            const nextMode = !darkMode;
+            localStorage.setItem('admin_theme', nextMode ? 'dark' : 'light');
+            return nextMode;
+        });
+    };
 
     const handleLogout = async (e) => {
         e.preventDefault();
@@ -47,6 +73,17 @@ export default function TopNavbar() {
     return (
         <header className="top-navbar">
             <div className="top-navbar-actions">
+                <button
+                    type="button"
+                    className="theme-toggle-btn"
+                    onClick={handleThemeToggle}
+                    aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
+                    aria-pressed={isDarkMode}
+                >
+                    {isDarkMode ? <Icons.Sun /> : <Icons.Moon />}
+                    <span>{isDarkMode ? 'Light mode' : 'Dark mode'}</span>
+                </button>
+
                 {/* <button type="button" className="icon-btn" aria-label="Notifications">
                     <Icons.Bell />
                     <span className="notification-badge" />
@@ -64,11 +101,11 @@ export default function TopNavbar() {
                         aria-label="User menu"
                         aria-expanded={dropdownOpen}
                     >
-                        {/* <img
+                        <img
                             src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces"
                             alt="Admin avatar"
                             className="profile-avatar"
-                        /> */}
+                        />
                         <span className="profile-name">
                             {displayName.toUpperCase()}
                         </span>

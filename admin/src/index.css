@@ -5276,3 +5276,135 @@ input:checked+.slider:before {
         width: 100%;
     }
 }
+
+html[data-theme="dark"] {
+    color-scheme: dark;
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] .dashboard_body,
+html[data-theme="dark"] .dashboard_main_wrapper,
+html[data-theme="dark"] .dashboard_content {
+    background-color: #111827;
+    color: #e5e7eb;
+}
+
+html[data-theme="dark"] .dashboard_content {
+    background-color: #111827 !important;
+}
+
+html[data-theme="dark"] .dashboard_content :is(
+    h1, h2, h3, h4, h5, p, span, small, label, dt, dd, th, td, strong, li, div,
+    .dashboard-title, .dashboard-subtitle, .card-title, .card-value,
+    .growth-title, .growth-subtitle, .panel-title, .panel-sub,
+    .page-title, .page-subtitle, .section-title, .profile-detail dt,
+    .profile-detail dd, .stat-title, .stat-value
+) {
+    color: #e5e7eb !important;
+}
+
+html[data-theme="dark"] .dashboard_content :is(
+    .dashboard-subtitle, .growth-subtitle, .panel-sub, .page-subtitle,
+    .info-label, .admin-card-subtitle, .profile-detail dt, .empty-state,
+    .no-data, .no-records-cell, .no-tx-data
+) {
+    color: #9ca3af !important;
+}
+
+html[data-theme="dark"] .dashboard_content :is(
+    .dashboard-container, .analytics-container, .finance-container,
+    .students-container, .course-module-container, .employee-page,
+    .add-employee-container, .employee-edit-page, .settings-container,
+    .admin-profile-container, .profile-page-container
+) {
+    background-color: #111827 !important;
+    color: #e5e7eb;
+}
+
+html[data-theme="dark"] .dashboard_content :is(
+    div[class*="-card"], section[class*="-card"], article[class*="-card"],
+    div[class*="-panel"], section[class*="-panel"], .filter-card,
+    .table-wrapper, .table-responsive, .info-section, .edit-card
+) {
+    background-color: #1f2937 !important;
+    border-color: #374151 !important;
+    color: #e5e7eb;
+}
+
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(255, 255, 255)"],
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(248, 250, 252)"],
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(249, 250, 251)"],
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(241, 245, 249)"],
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(226, 232, 240)"],
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(248, 248, 248)"] {
+    background-color: #1f2937 !important;
+    border-color: #374151 !important;
+}
+
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(220, 252, 231)"] {
+    background-color: #14532d !important;
+}
+
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(254, 226, 226)"] {
+    background-color: #7f1d1d !important;
+}
+
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(254, 243, 199)"],
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(254, 249, 195)"] {
+    background-color: #78350f !important;
+}
+
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(224, 231, 255)"] {
+    background-color: #312e81 !important;
+}
+
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(239, 246, 255)"],
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(240, 249, 255)"] {
+    background-color: #1e3a8a !important;
+}
+
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(243, 244, 246)"],
+html[data-theme="dark"] .dashboard_content [style*="background-color: rgb(248, 250, 252)"] {
+    color: #e5e7eb !important;
+}
+
+html[data-theme="dark"] .dashboard_content :is(
+    input, select, textarea, .filter-select, .student-search-field,
+    .course-search-input, .growth-period-select, .fee-date-filter
+) {
+    background-color: #111827 !important;
+    border-color: #4b5563 !important;
+    color: #f3f4f6 !important;
+}
+
+html[data-theme="dark"] .dashboard_content input::placeholder,
+html[data-theme="dark"] .dashboard_content textarea::placeholder {
+    color: #9ca3af !important;
+}
+
+html[data-theme="dark"] .dashboard_content :is(table, thead, tbody, tr) {
+    background-color: #1f2937;
+}
+
+html[data-theme="dark"] .dashboard_content :is(th, td) {
+    border-color: #374151 !important;
+}
+
+html[data-theme="dark"] .dashboard_content thead th {
+    background-color: #273449 !important;
+}
+
+html[data-theme="dark"] .dashboard_content tbody tr:hover {
+    background-color: #273449 !important;
+}
+
+html[data-theme="dark"] .dashboard_content :is(.modal-backdrop, .recent-profile-overlay) {
+    background-color: rgba(3, 7, 18, 0.78);
+}
+
+html[data-theme="dark"] .dashboard_content :is(
+    .status-badge, .student-status-badge, .growth-badge, .status-pill,
+    .badge-role, .pay-mode-pill, .due-badge
+) {
+    filter: brightness(0.82);
+}
