@@ -23,10 +23,10 @@ const TopNavbar = ({ isDarkMode, onToggleTheme }) => (
       <Link
         className="navbar-user"
         to="/profile"
-        aria-label="Open Vishal Kumar's profile"
+        aria-label="Open Rahul Bhola's profile"
       >
-        <div className="user-avatar">VK</div>
-        <span className="user-name">Vishal Kumar</span>
+        <div className="user-avatar">RB</div>
+        <span className="user-name">Rahul Bhola</span>
       </Link>
     </div>
   </header>

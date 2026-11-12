@@ -23,7 +23,7 @@ const feePayments = [
 ];
 
 const student = {
-  name: 'Vishal Kumar',
+  name: 'Rahul Bhola',
   course: 'Full Stack MERN Bootcamp',
   totalFee: 30000,
 };

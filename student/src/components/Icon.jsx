@@ -43,6 +43,18 @@ const iconPaths = {
       <path d="m7 10 5 5 5-5M12 15V3" />
     </>
   ),
+  'graduation-cap': (
+    <>
+      <path d="m2 10 10-5 10 5-10 5-10-5Z" />
+      <path d="M6 12v5c3 2 9 2 12 0v-5M22 10v6" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
+    </>
+  ),
   logout: (
     <>
       <path d="M10 17l5-5-5-5M15 12H3" />

@@ -9,16 +9,19 @@
 }
 
 .sidebar-container {
+    flex: 0 0 250px;
     width: 250px;
     min-width: 250px;
-    height: 100vh;
-    z-index: 9999;
+    height: 100%;
+    min-height: 0;
+    z-index: 999;
     background-color: var(--sidebar-bg);
     border-right: 1px solid var(--sidebar-border);
     display: flex;
     flex-direction: column;
-    position: relative;
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: sticky;
+    top: 0;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), flex-basis 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     padding: 24px 16px;
     box-sizing: border-box;
 }
@@ -32,6 +35,7 @@
 }
 
 .sidebar-container.collapsed {
+    flex-basis: 80px;
     width: 80px;
     min-width: 80px;
     padding: 24px 10px;
@@ -159,4 +163,31 @@
 .collapsed .logout-btn {
     justify-content: center;
     padding: 12px 0;
+}
+
+@media (max-height: 640px) {
+    .sidebar-container,
+    .sidebar-container.collapsed {
+        padding-top: 16px;
+        padding-bottom: 16px;
+    }
+
+    .sidebar-header {
+        margin-bottom: 16px;
+    }
+
+    .nav-list {
+        gap: 6px;
+    }
+
+    .nav-link {
+        padding-top: 9px;
+        padding-bottom: 9px;
+    }
+
+    .collapsed .nav-link,
+    .collapsed .logout-btn {
+        padding-top: 9px;
+        padding-bottom: 9px;
+    }
 }
