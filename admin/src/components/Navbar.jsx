@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import './Navbar.css';
 
 // SVG Icons
@@ -36,6 +37,12 @@ const Icons = {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
       <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </svg>
+  ),
+  Attendance: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18M8 14h3" />
     </svg>
   ),
   Analytics: () => (
@@ -91,10 +98,12 @@ const menuItems = [
   { name: 'Employees', path: '/employees', icon: <Icons.Employees /> },
   { name: 'Analytics', path: '/analytics', icon: <Icons.Analytics /> },
   { name: 'Finances', path: '/finances', icon: <Icons.Finances /> },
+  { name: 'Attendance', path: '/attendance', icon: <Icons.Attendance /> },
 ];
 
 export default function Navbar() {
   const location = useLocation();
+  const { user } = useAuth();
 
   // Desktop minimize state
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -173,7 +182,10 @@ export default function Navbar() {
 
         {/* Main Navigation Links */}
         <nav className="sidebar-nav">
-          {menuItems.map((item) => {
+          {(user?.emp_role === 'admin'
+            ? menuItems
+            : [{ name: 'Attendance', path: '/attendance', icon: <Icons.Attendance /> }]
+          ).map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Link

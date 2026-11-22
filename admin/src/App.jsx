@@ -16,7 +16,6 @@ import Course from "./pages/Course";
 import Student from "./pages/Student";
 import Analytics from "./pages/Analytics";
 import Finance from "./pages/Finance";
-import Setting from "./pages/Setting";
 import Profile from "./pages/Profile";
 
 import Employee from "./components/Employee";
@@ -27,6 +26,7 @@ import AdminLogin from "./pages/AdminLogin";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import StudentRegister from "./components/StudentRegister";
+import Attendance from "./pages/Attendance";
 
 function DashboardLayout() {
   return (
@@ -43,7 +43,7 @@ function DashboardLayout() {
 }
 
 function LoginRoute() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -53,16 +53,23 @@ function LoginRoute() {
         alignItems: "center",
         justifyContent: "center"
       }}>
-        Checking admin session...
+        Checking staff session...
       </div>
     );
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={user?.emp_role === "employee" ? "/attendance" : "/"} replace />;
   }
 
   return <AdminLogin />;
+}
+
+function AdminOnly() {
+  const { user } = useAuth();
+  return user?.emp_role === "admin"
+    ? <Outlet />
+    : <Navigate to="/attendance" replace />;
 }
 
 function AppRoutes() {
@@ -72,19 +79,19 @@ function AppRoutes() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/courses" element={<Course />} />
-          <Route path="/students" element={<Student />} />
-          <Route path="/analytics" element={<Analytics />} />
-          <Route path="/finances" element={<Finance />} />
-          {/* <Route path="/settings" element={<Setting />} /> */}
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/student/register" element={<StudentRegister />} />
-
-
-          <Route path="/employees" element={<Employee />} />
-          <Route path="/employees/add" element={<EmployeeAdd />} />
-          <Route path="/employees/edit/:id" element={<EmployeeEdit />} />
+          <Route element={<AdminOnly />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/courses" element={<Course />} />
+            <Route path="/students" element={<Student />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/finances" element={<Finance />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/student/register" element={<StudentRegister />} />
+            <Route path="/employees" element={<Employee />} />
+            <Route path="/employees/add" element={<EmployeeAdd />} />
+            <Route path="/employees/edit/:id" element={<EmployeeEdit />} />
+          </Route>
+          <Route path="/attendance" element={<Attendance />} />
         </Route>
       </Route>
 

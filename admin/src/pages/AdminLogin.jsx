@@ -33,7 +33,7 @@ export default function AdminLogin() {
       // Authenticate through AuthContext and authService
       await login(email.trim(), password);
 
-      setSuccess("Admin login successful!");
+      setSuccess("Staff login successful!");
 
       // Return to the requested page or open the dashboard
       const destination = location.state?.from?.pathname || "/";
@@ -75,10 +75,10 @@ export default function AdminLogin() {
           </svg>
         </div>
 
-        <h1 className="login-title">Admin Login</h1>
+        <h1 className="login-title">Staff Login</h1>
 
         <p className="login-subtitle">
-          Sign in to access your administration dashboard.
+          Sign in to access your admin or teacher attendance workspace.
         </p>
 
         <form className="login-form" onSubmit={handleSubmit}>

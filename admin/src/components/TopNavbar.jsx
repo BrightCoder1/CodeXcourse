@@ -114,15 +114,18 @@ export default function TopNavbar() {
 
                     {dropdownOpen && (
                         <div className="profile-dropdown" style={{ position: 'absolute', right: 0, zIndex: 1000 }}>
-                            <Link
-                                to="/profile"
-                                className="dropdown-item"
-                                onClick={() => setDropdownOpen(false)}
-                            >
-                                My Profile
-                            </Link>
-
-                            <hr className="dropdown-divider" />
+                            {user?.emp_role === 'admin' && (
+                                <>
+                                    <Link
+                                        to="/profile"
+                                        className="dropdown-item"
+                                        onClick={() => setDropdownOpen(false)}
+                                    >
+                                        My Profile
+                                    </Link>
+                                    <hr className="dropdown-divider" />
+                                </>
+                            )}
 
                             <button
                                 type="button"

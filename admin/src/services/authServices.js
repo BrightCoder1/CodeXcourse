@@ -59,11 +59,11 @@ const authService = {
       throw new Error("No token found");
     }
 
-    const response = await getOnce("/profile");
+    const response = await getOnce("/attendance/me");
     const user = response.data.user || response.data;
-    if (user.emp_role !== "admin") {
+    if (!["admin", "employee"].includes(user.emp_role)) {
       localStorage.removeItem("admin_token");
-      throw new Error("This account does not have administrator access.");
+      throw new Error("This account does not have staff access.");
     }
     return user;
   },

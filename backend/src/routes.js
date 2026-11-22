@@ -34,6 +34,39 @@ const {
 } = require("./controllers/Student.controller.js");
 const { createCourse, getAllCourses, getCourseById, updateCourse, deleteCourse } = require("./controllers/Course.controller.js");
 const { createMessage } = require("./controllers/Message.controller.js");
+const attendanceAdminAuth = require("./middleware/attendanceAdminAuth.js");
+const staffAuth = require("./middleware/staffAuth.js");
+const {
+  getTeacherCourses,
+  getTeacherCourseStudents,
+  saveTeacherAttendance,
+  getTeacherHistory,
+  getAdminStudentAttendance,
+  getAdminEmployeeAttendance,
+  saveAdminEmployeeAttendance,
+  getAdminAssignments,
+  updateAdminAssignments,
+  getAttendanceSummary,
+  getStaffProfile,
+} = require("./controllers/Attendance.controller.js");
+const {
+  closeAttendanceSession,
+  markSessionAbsentees,
+  startAttendanceSession,
+} = require("./controllers/AttendanceSession.controller.js");
+const {
+  getStudentAttendanceDashboard,
+  getStudentAttendanceHistory,
+  markStudentCourseAttendance,
+  markStudentDailyAttendance,
+} = require("./controllers/SelfAttendance.controller.js");
+
+const teacherOnly = (req, res, next) => {
+  if (req.user.emp_role !== "employee") {
+    return res.status(403).json({ success: false, message: "Teachers only." });
+  }
+  return next();
+};
 
 
 // Public Auth routes
@@ -71,6 +104,28 @@ router.post('/student/:id/fee-payments', adminAuth, submitStudentFee);
 router.put('/student/:id', adminAuth, updateStudent);
 router.delete('/student/:id', adminAuth, deleteStudent);
 
+// Attendance routes: all staff endpoints authenticate on the server; teacher
+// endpoints reject admins and admin endpoints reject employees.
+router.get("/attendance/me", staffAuth, getStaffProfile);
+router.get("/attendance/teacher/courses", staffAuth, teacherOnly, getTeacherCourses);
+router.get("/attendance/teacher/courses/:courseId/students", staffAuth, teacherOnly, getTeacherCourseStudents);
+router.post("/attendance/teacher/courses/:courseId", staffAuth, teacherOnly, saveTeacherAttendance);
+router.get("/attendance/teacher/history", staffAuth, teacherOnly, getTeacherHistory);
+router.post("/attendance/teacher/courses/:courseId/session", staffAuth, teacherOnly, startAttendanceSession);
+router.patch("/attendance/teacher/sessions/:sessionId/close", staffAuth, teacherOnly, closeAttendanceSession);
+router.post("/attendance/teacher/sessions/:sessionId/mark-absent", staffAuth, teacherOnly, markSessionAbsentees);
+
+router.get("/attendance/admin/summary", staffAuth, attendanceAdminAuth, getAttendanceSummary);
+router.get("/attendance/admin/students", staffAuth, attendanceAdminAuth, getAdminStudentAttendance);
+router.get("/attendance/admin/employees", staffAuth, attendanceAdminAuth, getAdminEmployeeAttendance);
+router.put("/attendance/admin/employees/:employeeId", staffAuth, attendanceAdminAuth, saveAdminEmployeeAttendance);
+router.get("/attendance/admin/assignments", staffAuth, attendanceAdminAuth, getAdminAssignments);
+router.put("/attendance/admin/assignments", staffAuth, attendanceAdminAuth, updateAdminAssignments);
+
+router.get("/attendance/student", studentAuth, getStudentAttendanceDashboard);
+router.get("/attendance/student/history", studentAuth, getStudentAttendanceHistory);
+router.post("/attendance/student/courses/:courseId/mark", studentAuth, markStudentCourseAttendance);
+router.post("/attendance/student/daily", studentAuth, markStudentDailyAttendance);
 
 // Course CRUD routes
 router.route("/courses")

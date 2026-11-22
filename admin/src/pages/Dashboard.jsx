@@ -3,6 +3,7 @@ import DashboardHeader from '../components/DashboardHeader';
 import DetailsOverview from '../components/DetailsOverview';
 import StudentGrowth from '../components/StudentGrowth';
 import RecentStudent from '../components/RecentStudent';
+import AttendanceDashboard from '../components/AttendanceDashboard';
 
 const Dashboard = () => {
     return (
@@ -12,6 +13,7 @@ const Dashboard = () => {
             />
 
             <DetailsOverview />
+            <AttendanceDashboard />
             {/* <Registration /> */}
             <StudentGrowth />
             <RecentStudent />

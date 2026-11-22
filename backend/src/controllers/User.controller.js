@@ -326,7 +326,7 @@ const loginUser = async (req, res) => {
 
     if (
       !user ||
-      user.emp_role !== "admin" ||
+      !["admin", "employee"].includes(user.emp_role) ||
       !(await user.comparePassword(password))
     ) {
       return res.status(401).json({
