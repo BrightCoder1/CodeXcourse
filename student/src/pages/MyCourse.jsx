@@ -1,57 +1,67 @@
+import { useEffect, useState } from 'react';
+import CourseAttendanceTimeline from '../components/CourseAttendanceTimeline';
 import Icon from '../components/Icon';
+import attendanceService from '../services/attendanceService';
+import { buildAssignedCourses } from '../services/courseProgress';
 import './MyCourse.css';
 
-const purchasedCourses = [
-  {
-    id: 'mern101',
-    name: 'Full Stack MERN Bootcamp',
-    code: 'MERN101',
-    instructor: 'CodeX Team',
-    studentName: 'Rahul Bhola',
-    completedLectures: 21,
-    totalLectures: 52,
-    lastLecture: 'Authentication & Authorization',
-    purchasedOn: '25 Oct 2026',
-    image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=900&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'dsa001',
-    name: 'Data Structures & Algorithms',
-    code: 'DSA001',
-    instructor: 'Vishal Kumar',
-    studentName: 'Rahul Bhola',
-    completedLectures: 14,
-    totalLectures: 40,
-    lastLecture: 'Linked Lists',
-    purchasedOn: '12 Oct 2026',
-    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=900&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'react201',
-    name: 'Advanced React & Redux',
-    code: 'REACT201',
-    instructor: 'Aisha Khan',
-    studentName: 'Rahul Bhola',
-    completedLectures: 45,
-    totalLectures: 45,
-    lastLecture: 'Custom Hooks',
-    purchasedOn: '02 Nov 2026',
-    image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=900&auto=format&fit=crop&q=80',
-  },
-];
+const formatDuration = (minutes) => {
+  const total = Number(minutes) || 0;
+  const hours = Math.floor(total / 60);
+  const remainder = total % 60;
+  return hours ? `${hours}h ${remainder}m` : `${remainder}m`;
+};
 
-const MyCourse = () => {
-  const completedLectures = purchasedCourses.reduce(
-    (total, course) => total + course.completedLectures,
-    0,
-  );
-  const totalLectures = purchasedCourses.reduce(
-    (total, course) => total + course.totalLectures,
-    0,
-  );
-  const completedCourses = purchasedCourses.filter(
-    (course) => course.completedLectures === course.totalLectures,
-  ).length;
+const formatDate = (value) => (
+  value ? new Date(value).toLocaleDateString() : 'No attendance recorded yet'
+);
+
+const fullName = (student) => [
+  student?.student_name,
+  student?.middle_name,
+  student?.last_name,
+].filter(Boolean).join(' ');
+
+const MyCourse = ({ student }) => {
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const studentName = fullName(student) || 'Student';
+  const studentInitials = studentName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+
+  useEffect(() => {
+    let active = true;
+    const loadCourses = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const [dashboard, history] = await Promise.all([
+          attendanceService.getDashboard(),
+          attendanceService.getHistory({}),
+        ]);
+        const assignedCourses = buildAssignedCourses(dashboard, history);
+        if (active) setCourses(assignedCourses);
+      } catch (requestError) {
+        if (active) setError(requestError.message || 'Unable to load your assigned courses.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    loadCourses();
+    return () => {
+      active = false;
+    };
+  }, [refreshVersion]);
+
+  const totalLectures = courses.reduce((total, course) => total + course.lectures, 0);
+  const coursesStarted = courses.filter((course) => course.lectures > 0).length;
 
   return (
     <section className="my-courses-page">
@@ -59,112 +69,128 @@ const MyCourse = () => {
         <div>
           <p className="my-courses-eyebrow">YOUR LEARNING SPACE</p>
           <h1>My Courses</h1>
-          <p>Purchased courses and your lecture-by-lecture progress.</p>
+          <p>Your assigned courses and lecture count from attendance.</p>
         </div>
-        <span className="my-courses-student">
-          <span className="my-courses-avatar">RB</span>
-          Rahul Bhola
-        </span>
+        <div className="my-courses-header-actions">
+          <span className="my-courses-student">
+            <span className="my-courses-avatar">{studentInitials}</span>
+            {studentName}
+          </span>
+          <button
+            type="button"
+            className="my-course-refresh-button"
+            onClick={() => setRefreshVersion((version) => version + 1)}
+            disabled={loading}
+          >
+            {loading ? 'Loading…' : 'Refresh'}
+          </button>
+        </div>
       </header>
 
-      <div className="my-courses-summary">
-        <article className="my-courses-stat">
-          <span className="my-courses-stat-icon purple"><Icon name="shopping-bag" size={21} /></span>
-          <div>
-            <strong>{purchasedCourses.length}</strong>
-            <span>Purchased courses</span>
-          </div>
-        </article>
-        <article className="my-courses-stat">
-          <span className="my-courses-stat-icon green"><Icon name="check-circle" size={21} /></span>
-          <div>
-            <strong>{completedLectures} <small>/ {totalLectures}</small></strong>
-            <span>Lectures completed</span>
-          </div>
-        </article>
-        <article className="my-courses-stat">
-          <span className="my-courses-stat-icon blue"><Icon name="award" size={21} /></span>
-          <div>
-            <strong>{completedCourses}</strong>
-            <span>Courses completed</span>
-          </div>
-        </article>
-      </div>
-
-      <div className="my-courses-list">
-        {purchasedCourses.map((course) => {
-          const progress = Math.round((course.completedLectures / course.totalLectures) * 100);
-          const isComplete = progress === 100;
-
-          return (
-            <article className="my-course-card" key={course.id}>
-              <div className="my-course-cover">
-                <img
-                  src={course.image}
-                  alt=""
-                  onError={(event) => {
-                    event.currentTarget.style.display = 'none';
-                  }}
-                />
-                <span className="my-course-code">{course.code}</span>
-                <span className="my-course-purchased">
-                  <Icon name="check-circle" size={15} />
-                  Purchased
-                </span>
-              </div>
-
-              <div className="my-course-content">
-                <div className="my-course-title-row">
-                  <div>
-                    <h2>{course.name}</h2>
-                    <p className="my-course-instructor">Instructor: {course.instructor}</p>
-                  </div>
-                  <span className={`my-course-progress-badge ${isComplete ? 'complete' : ''}`}>
-                    {isComplete ? 'Completed' : 'In progress'}
-                  </span>
-                </div>
-
-                <div className="my-course-progress">
-                  <div className="my-course-progress-labels">
-                    <span>Course progress</span>
-                    <strong>{progress}%</strong>
-                  </div>
-                  <div
-                    className="my-course-progress-track"
-                    role="progressbar"
-                    aria-label={`${course.name} progress`}
-                    aria-valuemin="0"
-                    aria-valuemax="100"
-                    aria-valuenow={progress}
-                  >
-                    <span style={{ width: `${progress}%` }} />
-                  </div>
-                </div>
-
-                <div className="my-course-details">
-                  <span>
-                    <Icon name="book" size={17} />
-                    <strong>{course.completedLectures} / {course.totalLectures}</strong> lectures completed
-                  </span>
-                  <span>
-                    <Icon name="user" size={17} />
-                    Progress for <strong>{course.studentName}</strong>
-                  </span>
-                </div>
-
-                <div className="my-course-footer">
-                  <span>Last lecture: {course.lastLecture}</span>
-                  <span>Purchased {course.purchasedOn}</span>
-                </div>
+      {loading ? (
+        <p className="my-courses-state" role="status">Loading your assigned courses…</p>
+      ) : error ? (
+        <div className="my-courses-state error">
+          <p role="alert">{error}</p>
+          <button
+            type="button"
+            className="my-course-refresh-button"
+            onClick={() => setRefreshVersion((version) => version + 1)}
+          >
+            Try again
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="my-courses-summary">
+            <article className="my-courses-stat">
+              <span className="my-courses-stat-icon purple"><Icon name="book" size={21} /></span>
+              <div>
+                <strong>{courses.length}</strong>
+                <span>Assigned courses</span>
               </div>
             </article>
-          );
-        })}
-      </div>
+            <article className="my-courses-stat">
+              <span className="my-courses-stat-icon green"><Icon name="check-circle" size={21} /></span>
+              <div>
+                <strong>{totalLectures}</strong>
+                <span>Lectures counted from attendance</span>
+              </div>
+            </article>
+            <article className="my-courses-stat">
+              <span className="my-courses-stat-icon blue"><Icon name="award" size={21} /></span>
+              <div>
+                <strong>{coursesStarted}</strong>
+                <span>Courses with attendance</span>
+              </div>
+            </article>
+          </div>
 
-      <p className="my-courses-demo-note">
-        Sample purchase and lecture progress data. Live student records are not connected yet.
-      </p>
+          {courses.length ? (
+            <div className="my-courses-list">
+              {courses.map((course) => (
+                <article className="my-course-card" key={course.id}>
+                  <div className="my-course-cover">
+                    {course.image && (
+                      <img
+                        src={course.image}
+                        alt=""
+                        onError={(event) => {
+                          event.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <span className="my-course-code">{course.code || 'COURSE'}</span>
+                    <span className="my-course-purchased">
+                      <Icon name="check-circle" size={15} />
+                      Assigned
+                    </span>
+                  </div>
+
+                  <div className="my-course-content">
+                    <div className="my-course-title-row">
+                      <div>
+                        <h2>{course.name}</h2>
+                        <p className="my-course-instructor">Instructor: {course.instructor}</p>
+                      </div>
+                      <span className={`my-course-progress-badge ${course.lectures ? 'started' : ''}`}>
+                        {course.lectures ? `Lecture ${course.lectures}` : 'Attendance not started'}
+                      </span>
+                    </div>
+
+                    <div className="my-course-details my-course-attendance-details">
+                      <span>
+                        <Icon name="book" size={17} />
+                        <strong>{course.lectures}</strong> lecture{course.lectures === 1 ? '' : 's'} attended
+                      </span>
+                      <span>
+                        <Icon name="check-circle" size={17} />
+                        <strong>{formatDuration(course.totalMinutes)}</strong> time recorded
+                      </span>
+                    </div>
+
+                    <div className="my-course-attendance-line">
+                      <span>Attendance by lecture</span>
+                      <strong>{course.lectures} {course.lectures === 1 ? 'lecture' : 'lectures'}</strong>
+                    </div>
+                    <CourseAttendanceTimeline
+                      courseName={course.name}
+                      records={course.attendanceRecords}
+                    />
+
+                    <div className="my-course-footer">
+                      <span>Last attendance: {formatDate(course.lastAttendance)}</span>
+                      {course.lectures > 0 && <span>Lecture count starts at 1 with your first check-in.</span>}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="my-courses-state">No course has been assigned to your student account yet.</p>
+          )}
+        </>
+      )}
     </section>
   );
 };

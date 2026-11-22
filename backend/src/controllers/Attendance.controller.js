@@ -1,14 +1,13 @@
-const mongoose = require("mongoose");
 const AttendanceSession = require("../models/AttendanceSession.model");
 const Course = require("../models/Course.model");
 const CourseAssignment = require("../models/CourseAssignment.model");
-const DailyAttendance = require("../models/DailyAttendance.model");
 const EmployeeAttendance = require("../models/EmployeeAttendance.model");
 const Student = require("../models/Student.models");
 const StudentAttendance = require("../models/StudentAttendance.model");
 const User = require("../models/user.models");
 const {
   courseStudentQuery,
+  matchesLegacyCourseEnrollment,
   parseDate,
   parseRange,
   todayString,
@@ -17,6 +16,8 @@ const {
 } = require("../utils/attendanceUtils");
 
 const STATUSES = ["present", "absent", "late", "leave"];
+const STUDENT_STATUSES = [...STATUSES, "in_progress"];
+const ADMIN_EDITABLE_STATUSES = STATUSES;
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const sendServerError = (res, error, message) => {
@@ -80,7 +81,7 @@ const getTeacherCourseStudents = async (req, res) => {
       course_id: course._id,
       date,
       student_id: { $in: students.map((student) => student._id) },
-    }).select("student_id status marked_at marked_by_type created_at");
+    }).select("student_id status check_in check_out total_minutes leave_reason marked_at marked_by_type created_at");
     const attendanceByStudent = new Map(
       records.map((record) => [record.student_id.toString(), record])
     );
@@ -96,108 +97,6 @@ const getTeacherCourseStudents = async (req, res) => {
     });
   } catch (error) {
     return sendServerError(res, error, "Failed to fetch the course attendance roster.");
-  }
-};
-
-const saveTeacherAttendance = async (req, res) => {
-  try {
-    const { courseId } = req.params;
-    if (!validId(courseId)) {
-      return res.status(400).json({ success: false, message: "Invalid course ID." });
-    }
-    const date = parseDate(req.body.date);
-    const entries = req.body.entries;
-    if (!date || !Array.isArray(entries) || entries.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Provide a valid, non-future date and at least one attendance entry.",
-      });
-    }
-    if (entries.length > 1000) {
-      return res.status(400).json({
-        success: false,
-        message: "Attendance can be saved for up to 1000 students at a time.",
-      });
-    }
-
-    const course = await getAssignedCourse(req.user._id, courseId);
-    if (!course) {
-      return res.status(403).json({
-        success: false,
-        message: "This course is not assigned to your account.",
-      });
-    }
-
-    const studentIds = [];
-    const seenIds = new Set();
-    for (const entry of entries) {
-      if (!entry || !validId(entry.studentId) || !STATUSES.includes(entry.status)) {
-        return res.status(400).json({
-          success: false,
-          message: "Each attendance entry must include a valid student ID and status.",
-        });
-      }
-      const studentId = new mongoose.Types.ObjectId(entry.studentId).toString();
-      if (seenIds.has(studentId)) {
-        return res.status(400).json({
-          success: false,
-          message: "A student can appear only once in an attendance submission.",
-        });
-      }
-      seenIds.add(studentId);
-      studentIds.push(new mongoose.Types.ObjectId(studentId));
-    }
-
-    const eligibleStudents = await Student.find({
-      _id: { $in: studentIds },
-      ...courseStudentQuery(course),
-    }).select("_id");
-    if (eligibleStudents.length !== studentIds.length) {
-      return res.status(400).json({
-        success: false,
-        message: "Attendance contains a student who is not enrolled in this course.",
-      });
-    }
-
-    const markedAt = new Date();
-    const session = await AttendanceSession.findOne({ course_id: course._id, date })
-      .select("_id");
-    const updates = {
-      marked_by: req.user._id,
-      marked_by_model: "User",
-      marked_by_type: req.user.emp_role === "admin" ? "admin" : "teacher",
-      marked_at: markedAt,
-    };
-    if (session) updates.session_id = session._id;
-    const operations = entries.map((entry) => ({
-      updateOne: {
-        filter: {
-          student_id: entry.studentId,
-          course_id: course._id,
-          date,
-        },
-        update: {
-          $set: { ...updates, status: entry.status },
-          $setOnInsert: { created_at: markedAt },
-        },
-        upsert: true,
-      },
-    }));
-    await StudentAttendance.bulkWrite(operations, { ordered: true });
-
-    return res.json({
-      success: true,
-      message: "Attendance saved successfully.",
-      count: entries.length,
-    });
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        message: "Attendance was updated at the same time. Refresh and try again.",
-      });
-    }
-    return sendServerError(res, error, "Failed to save student attendance.");
   }
 };
 
@@ -247,6 +146,9 @@ const getAdminStudentAttendance = async (req, res) => {
     if (!validNameFilter(req.query.name)) {
       return res.status(400).json({ success: false, message: "Student name filter must be 100 characters or fewer." });
     }
+    if (!validNameFilter(req.query.studentId)) {
+      return res.status(400).json({ success: false, message: "Student ID filter must be 100 characters or fewer." });
+    }
     const parsedRange = parseRange(req.query);
     if (parsedRange.error) {
       return res.status(400).json({ success: false, message: parsedRange.error });
@@ -260,50 +162,90 @@ const getAdminStudentAttendance = async (req, res) => {
     }
     if (Object.keys(parsedRange.range).length) filter.date = parsedRange.range;
     if (req.query.status) {
-      if (!STATUSES.includes(req.query.status)) {
+      if (!STUDENT_STATUSES.includes(req.query.status)) {
         return res.status(400).json({ success: false, message: "Invalid attendance status." });
       }
       filter.status = req.query.status;
     }
 
-    const dailyFilter = {};
-    if (Object.keys(parsedRange.range).length) dailyFilter.date = parsedRange.range;
-    if (req.query.status) dailyFilter.status = req.query.status;
-    const [courseRecords, dailyRecords] = await Promise.all([
-      StudentAttendance.find(filter)
-        .populate("student_id", "student_name middle_name last_name roll_number application_number course")
-        .populate("course_id", "courseName courseCode")
-        .populate("marked_by", "emp_name student_name middle_name last_name")
-        .sort({ date: -1 }),
-      req.query.courseId
-        ? []
-        : DailyAttendance.find(dailyFilter)
-          .populate("student_id", "student_name middle_name last_name roll_number application_number course")
-          .sort({ date: -1, marked_at: -1 }),
-    ]);
-    const records = [
-      ...courseRecords.map((record) => ({ ...record.toObject(), record_type: "course" })),
-      ...dailyRecords.map((record) => ({ ...record.toObject(), record_type: "daily" })),
-    ].sort((left, right) =>
-      new Date(right.date) - new Date(left.date) ||
-      new Date(right.marked_at || right.created_at) - new Date(left.marked_at || left.created_at)
-    );
+    const courseRecords = await StudentAttendance.find(filter)
+      .populate("student_id", "student_name middle_name last_name roll_number application_number admission_number course")
+      .populate("course_id", "courseName courseCode")
+      .populate("marked_by", "emp_name student_name middle_name last_name")
+      .sort({ date: -1 });
+    const records = courseRecords.map((record) => ({
+      ...record.toObject(),
+      record_type: "course",
+    }));
     const nameFilter = typeof req.query.name === "string"
       ? req.query.name.trim().toLocaleLowerCase()
       : "";
-    const data = nameFilter
-      ? records.filter((record) => {
-        const student = record.student_id;
-        const name = [student?.student_name, student?.middle_name, student?.last_name]
-          .filter(Boolean)
-          .join(" ")
-          .toLocaleLowerCase();
-        return name.includes(nameFilter);
-      })
-      : records;
+    const studentIdFilter = typeof req.query.studentId === "string"
+      ? req.query.studentId.trim().toLocaleLowerCase()
+      : "";
+    const data = records.filter((record) => {
+      const student = record.student_id;
+      const name = [student?.student_name, student?.middle_name, student?.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase();
+      const identifiers = [
+        student?._id,
+        student?.roll_number,
+        student?.application_number,
+        student?.admission_number,
+      ]
+        .filter(Boolean)
+        .map((identifier) => String(identifier).toLocaleLowerCase());
+      return (!nameFilter || name.includes(nameFilter)) &&
+        (!studentIdFilter || identifiers.some((identifier) => identifier.includes(studentIdFilter)));
+    });
     return res.json({ success: true, data });
   } catch (error) {
     return sendServerError(res, error, "Failed to fetch student attendance.");
+  }
+};
+
+const saveAdminStudentAttendance = async (req, res) => {
+  try {
+    const { attendanceId } = req.params;
+    const status = req.body?.status;
+    if (!validId(attendanceId) || !ADMIN_EDITABLE_STATUSES.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide a valid course attendance record and status.",
+      });
+    }
+
+    const record = await StudentAttendance.findByIdAndUpdate(
+      attendanceId,
+      {
+        $set: {
+          status,
+          marked_by: req.user._id,
+          marked_by_model: "User",
+          marked_by_type: "admin",
+          marked_at: new Date(),
+        },
+      },
+      { new: true, runValidators: true },
+    )
+      .populate("student_id", "student_name middle_name last_name roll_number application_number course")
+      .populate("course_id", "courseName courseCode")
+      .populate("marked_by", "emp_name");
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        message: "Student attendance record was not found.",
+      });
+    }
+    return res.json({
+      success: true,
+      message: "Student attendance status updated.",
+      data: { ...record.toObject(), record_type: "course" },
+    });
+  } catch (error) {
+    return sendServerError(res, error, "Failed to update student attendance status.");
   }
 };
 
@@ -431,6 +373,119 @@ const getAdminAssignments = async (req, res) => {
   }
 };
 
+const getAdminCourseStudents = async (req, res) => {
+  try {
+    if (!validId(req.params.courseId)) {
+      return res.status(400).json({ success: false, message: "Invalid course ID." });
+    }
+    const course = await Course.findById(req.params.courseId)
+      .select("_id courseName courseCode");
+    if (!course) {
+      return res.status(404).json({ success: false, message: "Course was not found." });
+    }
+
+    const students = await Student.find()
+      .select("_id student_name middle_name last_name email roll_number application_number admission_number course course_ids")
+      .sort({ student_name: 1, last_name: 1 });
+    const assignedStudentIds = students
+      .filter((student) => Array.isArray(student.course_ids)
+        ? student.course_ids.some((courseId) => courseId.toString() === course._id.toString())
+        : matchesLegacyCourseEnrollment(student.course, course))
+      .map((student) => student._id.toString());
+
+    return res.json({
+      success: true,
+      data: {
+        students: students.map((student) => student.toObject()),
+        assignedStudentIds,
+      },
+    });
+  } catch (error) {
+    return sendServerError(res, error, "Failed to fetch course students.");
+  }
+};
+
+const saveAdminCourseStudents = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const studentIds = req.body?.studentIds;
+    if (!validId(courseId) || !Array.isArray(studentIds) ||
+        studentIds.some((studentId) => !validId(studentId))) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide a valid course ID and a unique list of valid student IDs.",
+      });
+    }
+    const normalizedStudentIds = studentIds.map((studentId) => studentId.toLowerCase());
+    if (new Set(normalizedStudentIds).size !== normalizedStudentIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide a valid course ID and a unique list of valid student IDs.",
+      });
+    }
+
+    const course = await Course.findById(courseId).select("_id courseName courseCode");
+    if (!course) {
+      return res.status(404).json({ success: false, message: "Course was not found." });
+    }
+
+    const [students, courses] = await Promise.all([
+      Student.find()
+        .select("_id course course_ids")
+        .sort({ student_name: 1 }),
+      Course.find().select("_id courseName courseCode"),
+    ]);
+    const studentsById = new Map(
+      students.map((student) => [student._id.toString().toLowerCase(), student])
+    );
+    if (normalizedStudentIds.some((studentId) => !studentsById.has(studentId))) {
+      return res.status(400).json({
+        success: false,
+        message: "One or more selected students were not found.",
+      });
+    }
+
+    const selectedIds = new Set(normalizedStudentIds);
+    const courseIdString = course._id.toString();
+    const operations = [];
+    students.forEach((student) => {
+      const studentId = student._id.toString().toLowerCase();
+      const currentlyAssigned = Array.isArray(student.course_ids)
+        ? student.course_ids.some((id) => id.toString() === courseIdString)
+        : matchesLegacyCourseEnrollment(student.course, course);
+      if (!currentlyAssigned && !selectedIds.has(studentId)) return;
+
+      const existingCourseIds = Array.isArray(student.course_ids)
+        ? student.course_ids.map((id) => id.toString())
+        : [
+          courses.find((candidate) =>
+            matchesLegacyCourseEnrollment(student.course, candidate)
+          )?._id?.toString(),
+        ].filter(Boolean);
+      const nextCourseIds = new Set(
+        existingCourseIds.filter((id) => id !== courseIdString)
+      );
+      if (selectedIds.has(studentId)) nextCourseIds.add(courseIdString);
+
+      operations.push({
+        updateOne: {
+          filter: { _id: student._id },
+          update: { $set: { course_ids: [...nextCourseIds] } },
+        },
+      });
+    });
+
+    if (operations.length) await Student.bulkWrite(operations);
+    return res.json({
+      success: true,
+      message: "Student course assignments updated.",
+      data: { assignedStudentIds: [...selectedIds] },
+    });
+  } catch (error) {
+    return sendServerError(res, error, "Failed to update course student assignments.");
+  }
+};
+
 const updateAdminAssignments = async (req, res) => {
   try {
     const { teacherId, courseIds } = req.body;
@@ -486,7 +541,7 @@ const updateAdminAssignments = async (req, res) => {
 const getAttendanceSummary = async (req, res) => {
   try {
     const today = parseDate(todayString(), { allowFuture: true });
-    const [studentTotals, employeeTotals, dailyStudentTotals, studentRates, employeeRates] = await Promise.all([
+    const [studentTotals, employeeTotals, studentRates, employeeRates] = await Promise.all([
       StudentAttendance.aggregate([
         { $match: { date: today } },
         { $group: { _id: "$status", count: { $sum: 1 } } },
@@ -495,16 +550,16 @@ const getAttendanceSummary = async (req, res) => {
         { $match: { date: today } },
         { $group: { _id: "$status", count: { $sum: 1 } } },
       ]),
-      DailyAttendance.aggregate([
-        { $match: { date: today } },
-        { $group: { _id: "$status", count: { $sum: 1 } } },
-      ]),
       StudentAttendance.aggregate([
         {
           $group: {
             _id: "$student_id",
             attended: { $sum: { $cond: [{ $in: ["$status", ["present", "late"]] }, 1, 0] } },
-            eligible: { $sum: { $cond: [{ $ne: ["$status", "leave"] }, 1, 0] } },
+            eligible: {
+              $sum: {
+                $cond: [{ $not: [{ $in: ["$status", ["leave", "in_progress"]] }] }, 1, 0],
+              },
+            },
           },
         },
         { $lookup: { from: "students", localField: "_id", foreignField: "_id", as: "student" } },
@@ -566,9 +621,7 @@ const getAttendanceSummary = async (req, res) => {
           absent: countFor(studentTotals, "absent"),
           late: countFor(studentTotals, "late"),
           leave: countFor(studentTotals, "leave"),
-        },
-        dailyStudents: {
-          present: countFor(dailyStudentTotals, "present"),
+          in_progress: countFor(studentTotals, "in_progress"),
         },
         employees: {
           present: countFor(employeeTotals, "present"),
@@ -590,12 +643,14 @@ const getStaffProfile = (req, res) => res.json({ success: true, user: req.user }
 module.exports = {
   getTeacherCourses,
   getTeacherCourseStudents,
-  saveTeacherAttendance,
   getTeacherHistory,
   getAdminStudentAttendance,
+  saveAdminStudentAttendance,
   getAdminEmployeeAttendance,
   saveAdminEmployeeAttendance,
   getAdminAssignments,
+  getAdminCourseStudents,
+  saveAdminCourseStudents,
   updateAdminAssignments,
   getAttendanceSummary,
   getStaffProfile,

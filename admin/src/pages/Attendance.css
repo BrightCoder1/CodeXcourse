@@ -205,6 +205,9 @@
 .attendance-status-badge.late { background: #fff5e8; color: #b66a19; }
 .attendance-count.leave,
 .attendance-status-badge.leave { background: #f0edff; color: #6350b5; }
+.attendance-count.in_progress,
+.attendance-status-badge.in_progress { background: #e8f4ff; color: #2f6d9d; }
+.attendance-status-badge.unmarked { background: #f2f1f4; color: #777382; }
 
 .attendance-student-list {
   display: flex;
@@ -259,6 +262,9 @@
   font-size: 11px;
 }
 
+.teacher-attendance-record { display: grid; grid-template-columns: repeat(2, minmax(75px, 1fr)); align-items: center; gap: 6px 9px; color: #777382; font-size: 10px; }
+.attendance-leave-reason { display: block; max-width: 220px; margin-top: 4px; color: #777382; font-size: 10px; }
+.student-attendance-table { min-width: 1180px; }
 .attendance-status-select {
   min-width: 140px;
   min-height: 38px !important;
@@ -456,7 +462,7 @@
   .selected-course-note { grid-column: auto; }
   .attendance-student-row { grid-template-columns: 25px 38px minmax(0, 1fr); gap: 9px; }
   .attendance-student-avatar { width: 36px; height: 36px; }
-  .attendance-student-row .attendance-status-select { grid-column: 3; width: 100%; }
+  .teacher-attendance-record { grid-column: 3; width: 100%; }
   .attendance-counts { justify-content: flex-start; }
   .attendance-actions { align-items: stretch; flex-direction: column; }
   .attendance-actions button { width: 100%; }

@@ -39,26 +39,27 @@ const staffAuth = require("./middleware/staffAuth.js");
 const {
   getTeacherCourses,
   getTeacherCourseStudents,
-  saveTeacherAttendance,
   getTeacherHistory,
   getAdminStudentAttendance,
+  saveAdminStudentAttendance,
   getAdminEmployeeAttendance,
   saveAdminEmployeeAttendance,
   getAdminAssignments,
+  getAdminCourseStudents,
+  saveAdminCourseStudents,
   updateAdminAssignments,
   getAttendanceSummary,
   getStaffProfile,
 } = require("./controllers/Attendance.controller.js");
 const {
   closeAttendanceSession,
-  markSessionAbsentees,
   startAttendanceSession,
 } = require("./controllers/AttendanceSession.controller.js");
 const {
+  applyStudentCourseLeave,
   getStudentAttendanceDashboard,
   getStudentAttendanceHistory,
   markStudentCourseAttendance,
-  markStudentDailyAttendance,
 } = require("./controllers/SelfAttendance.controller.js");
 
 const teacherOnly = (req, res, next) => {
@@ -109,23 +110,24 @@ router.delete('/student/:id', adminAuth, deleteStudent);
 router.get("/attendance/me", staffAuth, getStaffProfile);
 router.get("/attendance/teacher/courses", staffAuth, teacherOnly, getTeacherCourses);
 router.get("/attendance/teacher/courses/:courseId/students", staffAuth, teacherOnly, getTeacherCourseStudents);
-router.post("/attendance/teacher/courses/:courseId", staffAuth, teacherOnly, saveTeacherAttendance);
 router.get("/attendance/teacher/history", staffAuth, teacherOnly, getTeacherHistory);
 router.post("/attendance/teacher/courses/:courseId/session", staffAuth, teacherOnly, startAttendanceSession);
 router.patch("/attendance/teacher/sessions/:sessionId/close", staffAuth, teacherOnly, closeAttendanceSession);
-router.post("/attendance/teacher/sessions/:sessionId/mark-absent", staffAuth, teacherOnly, markSessionAbsentees);
 
 router.get("/attendance/admin/summary", staffAuth, attendanceAdminAuth, getAttendanceSummary);
 router.get("/attendance/admin/students", staffAuth, attendanceAdminAuth, getAdminStudentAttendance);
+router.put("/attendance/admin/students/:attendanceId", staffAuth, attendanceAdminAuth, saveAdminStudentAttendance);
 router.get("/attendance/admin/employees", staffAuth, attendanceAdminAuth, getAdminEmployeeAttendance);
 router.put("/attendance/admin/employees/:employeeId", staffAuth, attendanceAdminAuth, saveAdminEmployeeAttendance);
 router.get("/attendance/admin/assignments", staffAuth, attendanceAdminAuth, getAdminAssignments);
 router.put("/attendance/admin/assignments", staffAuth, attendanceAdminAuth, updateAdminAssignments);
+router.get("/attendance/admin/courses/:courseId/students", staffAuth, attendanceAdminAuth, getAdminCourseStudents);
+router.put("/attendance/admin/courses/:courseId/students", staffAuth, attendanceAdminAuth, saveAdminCourseStudents);
 
 router.get("/attendance/student", studentAuth, getStudentAttendanceDashboard);
 router.get("/attendance/student/history", studentAuth, getStudentAttendanceHistory);
 router.post("/attendance/student/courses/:courseId/mark", studentAuth, markStudentCourseAttendance);
-router.post("/attendance/student/daily", studentAuth, markStudentDailyAttendance);
+router.post("/attendance/student/courses/:courseId/leave", studentAuth, applyStudentCourseLeave);
 
 // Course CRUD routes
 router.route("/courses")

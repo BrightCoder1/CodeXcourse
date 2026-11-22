@@ -1,4 +1,9 @@
 const Course = require("../models/Course.model");
+const AttendanceSession = require("../models/AttendanceSession.model");
+const CourseAssignment = require("../models/CourseAssignment.model");
+const Student = require("../models/Student.models");
+const StudentAttendance = require("../models/StudentAttendance.model");
+const { courseStudentQuery } = require("../utils/attendanceUtils");
 
 const handleCourseError = (res, error, fallbackMessage) => {
   if (error.code === 11000) {
@@ -153,6 +158,27 @@ const updateCourse = async (req, res) => {
 
 const deleteCourse = async (req, res) => {
   try {
+    const course = await Course.findById(req.params.id);
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found.'
+      });
+    }
+
+    const [studentCount, teacherAssignmentCount, sessionCount, attendanceCount] = await Promise.all([
+      Student.countDocuments(courseStudentQuery(course)),
+      CourseAssignment.countDocuments({ course_id: course._id }),
+      AttendanceSession.countDocuments({ course_id: course._id }),
+      StudentAttendance.countDocuments({ course_id: course._id }),
+    ]);
+    if (studentCount || teacherAssignmentCount || sessionCount || attendanceCount) {
+      return res.status(409).json({
+        success: false,
+        message: 'Remove assigned students, teachers, and attendance records before deleting this course.'
+      });
+    }
+
     const deletedCourse = await Course.findByIdAndDelete(req.params.id);
     if (!deletedCourse) {
       return res.status(404).json({

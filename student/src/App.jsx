@@ -119,7 +119,7 @@ function AppLayout() {
               path="/profile"
               element={<Profile student={student} onStudentUpdated={setStudent} />}
             />
-            <Route path="/mycourse" element={<MyCourse />} />
+            <Route path="/mycourse" element={<MyCourse student={student} />} />
             <Route path="/courselist" element={<CourseList />} />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/fees" element={<Fees student={student} />} />

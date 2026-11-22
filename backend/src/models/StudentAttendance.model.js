@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const attendanceStatuses = ["present", "absent", "late", "leave"];
+const attendanceStatuses = ["present", "absent", "late", "leave", "in_progress"];
 
 const studentAttendanceSchema = new mongoose.Schema(
   {
@@ -16,6 +16,10 @@ const studentAttendanceSchema = new mongoose.Schema(
     },
     date: { type: Date, required: true },
     status: { type: String, enum: attendanceStatuses, required: true },
+    check_in: { type: Date, default: null },
+    check_out: { type: Date, default: null },
+    total_minutes: { type: Number, min: 0, default: 0 },
+    leave_reason: { type: String, trim: true, maxlength: 500, default: "" },
     marked_by: {
       type: mongoose.Schema.Types.ObjectId,
       refPath: "marked_by_model",

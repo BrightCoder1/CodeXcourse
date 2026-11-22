@@ -1,6 +1,8 @@
 const Student = require('../models/Student.models');
+const Course = require('../models/Course.model');
 const mongoose = require('mongoose');
 const { randomBytes } = require('crypto');
+const { enrolledCourseQuery } = require('../utils/attendanceUtils');
 
 const student_register = async (req, res) => {
     try {
@@ -75,6 +77,12 @@ const student_register = async (req, res) => {
 
         // Sanitize numeric fields to avoid empty string cast errors
         const sanitizedData = { ...req.body };
+        const catalogCourse = await Course.findOne(enrolledCourseQuery(course))
+            .select('_id courseName');
+        if (catalogCourse) {
+            sanitizedData.course = catalogCourse.courseName;
+            sanitizedData.course_ids = [catalogCourse._id];
+        }
         const numericFields = [
             'annual_family_income',
             'tenth_passing_year',

@@ -14,6 +14,7 @@ const STATUS_LABELS = {
   absent: "Absent",
   late: "Late",
   leave: "Leave",
+  in_progress: "Checked in",
 };
 
 const fullName = (student) =>
@@ -27,12 +28,19 @@ const markedByName = (record) =>
   "";
 
 const attendanceSource = (record) =>
-  record.record_type === "daily" ? "Daily attendance" : record.course_id?.courseName || "—";
+  record.course_id?.courseName || "—";
 
 const markedByLabel = (record) => {
-  const markerType = record.marked_by_type || (record.record_type === "daily" ? "student" : "teacher");
-  const markerName = record.record_type === "daily" ? "Self" : markedByName(record);
+  const markerType = record.marked_by_type || "teacher";
+  const markerName = markedByName(record);
   return `${markerType.replace(/^./, (letter) => letter.toUpperCase())}${markerName ? ` · ${markerName}` : ""}`;
+};
+
+const formatDuration = (minutes) => {
+  const total = Number(minutes) || 0;
+  const hours = Math.floor(total / 60);
+  const remainder = total % 60;
+  return hours ? `${hours}h ${remainder}m` : `${remainder}m`;
 };
 
 const csvCell = (value) => {
@@ -74,7 +82,7 @@ function SummaryCards({ summary }) {
   const cards = [
     { title: "Students present today", value: summary?.students?.present || 0, tone: "green" },
     { title: "Students absent today", value: summary?.students?.absent || 0, tone: "red" },
-    { title: "Daily student self-check-ins", value: summary?.dailyStudents?.present || 0, tone: "green" },
+    { title: "Students currently checked in", value: summary?.students?.in_progress || 0, tone: "green" },
     { title: "Teachers present today", value: summary?.employees?.present || 0, tone: "blue" },
     { title: "Teachers absent today", value: summary?.employees?.absent || 0, tone: "orange" },
   ];
@@ -102,7 +110,6 @@ function TeacherAttendance() {
   const [history, setHistory] = useState([]);
   const [historyRange, setHistoryRange] = useState({ from: "", to: "" });
   const [busy, setBusy] = useState(false);
-  const [now, setNow] = useState(() => new Date());
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -135,47 +142,13 @@ function TeacherAttendance() {
     return () => { active = false; };
   }, [courseId, date]);
 
-  useEffect(() => {
-    const intervalId = window.setInterval(() => setNow(new Date()), 15000);
-    return () => window.clearInterval(intervalId);
-  }, []);
-
   const loadingRoster = Boolean(courseId && date && loadedRosterKey !== `${courseId}:${date}`);
-
-  const updateStudentStatus = (studentId, status) => {
-    setStudents((current) => current.map((student) =>
-      student._id === studentId ? { ...student, attendance_status: status } : student
-    ));
-  };
 
   const counts = useMemo(() => students.reduce((total, student) => {
     const status = student.attendance_status;
     if (status) total[status] += 1;
     return total;
-  }, { present: 0, absent: 0, late: 0, leave: 0 }), [students]);
-  const allMarked = students.length > 0 && students.every((student) =>
-    STATUS_OPTIONS.includes(student.attendance_status)
-  );
-
-  const saveAttendance = async () => {
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      await attendanceServices.saveTeacherAttendance(courseId, {
-        date,
-        entries: students.map((student) => ({
-          studentId: student._id,
-          status: student.attendance_status,
-        })),
-      });
-      setNotice("Attendance saved. You can reopen this date to review or edit it.");
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setBusy(false);
-    }
-  };
+  }, { present: 0, absent: 0, late: 0, leave: 0, in_progress: 0 }), [students]);
 
   const refreshRoster = async () => {
     const result = await attendanceServices.getTeacherStudents(courseId, date);
@@ -214,22 +187,6 @@ function TeacherAttendance() {
     }
   };
 
-  const markAbsentees = async () => {
-    if (!window.confirm("Mark every student who has not checked in as absent?")) return;
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const result = await attendanceServices.markSessionAbsentees(session._id);
-      await refreshRoster();
-      setNotice(`${result.count} students marked absent.`);
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const loadHistory = async (event) => {
     event.preventDefault();
     setError("");
@@ -245,15 +202,13 @@ function TeacherAttendance() {
 
   const selectedCourse = courses.find((course) => course._id === courseId);
   const isToday = date === today();
-  const canMarkAbsentees = Boolean(session && (!session.is_open || now > new Date(session.end_time)));
-
   return (
     <div className="attendance-page">
       <header className="attendance-page-header">
         <div>
           <p className="attendance-eyebrow">TEACHER WORKSPACE</p>
           <h1>Class attendance</h1>
-          <p>Mark attendance for your assigned classes and review past sessions.</p>
+          <p>Open a class window; each student checks in and checks out individually.</p>
         </div>
       </header>
 
@@ -301,7 +256,7 @@ function TeacherAttendance() {
           <p>
             {session
               ? `Session: ${new Date(session.start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} – ${new Date(session.end_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-              : "Open a timed window so enrolled students can mark themselves present."}
+              : "Open a timed window for enrolled students to check in."}
           </p>
         </div>
         <div className="attendance-session-actions">
@@ -319,11 +274,6 @@ function TeacherAttendance() {
           {session?.is_open && (
             <button type="button" className="attendance-secondary-button" disabled={busy} onClick={closeSession}>Close attendance</button>
           )}
-          {session && (
-            <button type="button" className="attendance-secondary-button" disabled={!canMarkAbsentees || busy} onClick={markAbsentees}>
-              Mark unmarked absent
-            </button>
-          )}
         </div>
         {!isToday && <span className="attendance-session-hint">Sessions can only be opened for today.</span>}
       </section>
@@ -335,7 +285,7 @@ function TeacherAttendance() {
             <p>{students.length} enrolled students · {date || "Select a date"}</p>
           </div>
           <div className="attendance-counts">
-            {STATUS_OPTIONS.map((status) => (
+            {["in_progress", ...STATUS_OPTIONS].map((status) => (
               <span className={`attendance-count ${status}`} key={status}>
                 {counts[status]} {STATUS_LABELS[status]}
               </span>
@@ -362,19 +312,17 @@ function TeacherAttendance() {
                     <strong>{fullName(student)}</strong>
                     <span>{student.roll_number || student.application_number || student.email}</span>
                   </div>
-                  <StatusSelect
-                    value={student.attendance_status}
-                    label={`Attendance status for ${fullName(student)}`}
-                    onChange={(status) => updateStudentStatus(student._id, status)}
-                  />
+                  <div className="teacher-attendance-record">
+                    <span className={`attendance-status-badge ${student.attendance_status || "unmarked"}`}>
+                      {STATUS_LABELS[student.attendance_status] || "Not marked"}
+                    </span>
+                    <span>In: {student.attendance?.check_in ? new Date(student.attendance.check_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</span>
+                    <span>Out: {student.attendance?.check_out ? new Date(student.attendance.check_out).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</span>
+                    <span>Time: {formatDuration(student.attendance?.total_minutes)}</span>
+                    {student.attendance?.leave_reason && <span className="attendance-leave-reason">{student.attendance.leave_reason}</span>}
+                  </div>
                 </article>
               ))}
-            </div>
-            <div className="attendance-actions">
-              <span>{allMarked ? "All students have a status." : "Select a status for every student before saving."}</span>
-              <button type="button" className="attendance-primary-button" disabled={!allMarked || busy} onClick={saveAttendance}>
-                {busy ? "Saving…" : "Save attendance"}
-              </button>
             </div>
           </>
         )}
@@ -394,7 +342,7 @@ function TeacherAttendance() {
         </form>
         <div className="attendance-table-wrap">
           <table className="attendance-table">
-            <thead><tr><th>Date</th><th>Student</th><th>Roll number</th><th>Status</th><th>Marked by</th><th>Marked at</th></tr></thead>
+          <thead><tr><th>Date</th><th>Student</th><th>Roll number</th><th>Status</th><th>In</th><th>Out</th><th>Time present</th><th>Marked by</th><th>Marked at</th></tr></thead>
             <tbody>
               {history.length ? history.map((record) => (
                 <tr key={record._id}>
@@ -402,10 +350,13 @@ function TeacherAttendance() {
                   <td>{fullName(record.student_id) || "Student"}</td>
                   <td>{record.student_id?.roll_number || "—"}</td>
                   <td><span className={`attendance-status-badge ${record.status}`}>{STATUS_LABELS[record.status]}</span></td>
+                  <td>{record.check_in ? new Date(record.check_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                  <td>{record.check_out ? new Date(record.check_out).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                  <td>{formatDuration(record.total_minutes)}</td>
                   <td>{(record.marked_by_type || "teacher").replace(/^./, (letter) => letter.toUpperCase())}{markedByName(record) ? ` · ${markedByName(record)}` : ""}</td>
                   <td>{new Date(record.marked_at || record.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
                 </tr>
-              )) : <tr><td className="attendance-empty-cell" colSpan="6">Set a date range and apply to view attendance history.</td></tr>}
+              )) : <tr><td className="attendance-empty-cell" colSpan="9">Set a date range and apply to view attendance history.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -424,27 +375,38 @@ function AdminAttendance() {
   const [selectedCourseIds, setSelectedCourseIds] = useState([]);
   const [studentsRecords, setStudentsRecords] = useState([]);
   const [employeeRecords, setEmployeeRecords] = useState([]);
-  const [studentFilters, setStudentFilters] = useState({ courseId: "", from: "", to: "", name: "", status: "" });
+  const [studentFilters, setStudentFilters] = useState({ courseId: "", from: "", to: "", name: "", studentId: "", status: "" });
   const [employeeFilters, setEmployeeFilters] = useState({ from: "", to: "", name: "", status: "" });
   const [markDate, setMarkDate] = useState(today());
   const [dailyEmployees, setDailyEmployees] = useState({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
+  const [studentStatusDrafts, setStudentStatusDrafts] = useState({});
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
+  const setLoadedStudentRecords = (records) => {
+    setStudentsRecords(records);
+    setStudentStatusDrafts(records.reduce((drafts, record) => ({
+      ...drafts,
+      [record._id]: record.status,
+    }), {}));
+  };
+
   const loadAdminData = async () => {
     try {
-      const [summaryData, assignmentData, studentRecords] = await Promise.all([
+      const [summaryData, assignmentData, studentRecords, employeeAttendance] = await Promise.all([
         attendanceServices.getSummary(),
         attendanceServices.getAdminAssignments(),
         attendanceServices.getStudentAttendance(studentFilters),
+        attendanceServices.getEmployeeAttendance(employeeFilters),
       ]);
       setSummary(summaryData);
       setCourses(assignmentData.courses);
       setTeachers(assignmentData.teachers);
       setAssignments(assignmentData.assignments);
-      setStudentsRecords(studentRecords);
+      setLoadedStudentRecords(studentRecords);
+      setEmployeeRecords(employeeAttendance);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -458,14 +420,16 @@ function AdminAttendance() {
       attendanceServices.getSummary(),
       attendanceServices.getAdminAssignments(),
       attendanceServices.getStudentAttendance({}),
+      attendanceServices.getEmployeeAttendance({}),
     ])
-      .then(([summaryData, assignmentData, studentRecords]) => {
+      .then(([summaryData, assignmentData, studentRecords, employeeAttendance]) => {
         if (!active) return;
         setSummary(summaryData);
         setCourses(assignmentData.courses);
         setTeachers(assignmentData.teachers);
         setAssignments(assignmentData.assignments);
-        setStudentsRecords(studentRecords);
+        setLoadedStudentRecords(studentRecords);
+        setEmployeeRecords(employeeAttendance);
       })
       .catch((requestError) => {
         if (active) setError(requestError.message);
@@ -504,7 +468,7 @@ function AdminAttendance() {
     event.preventDefault();
     setError("");
     try {
-      setStudentsRecords(await attendanceServices.getStudentAttendance(studentFilters));
+      setLoadedStudentRecords(await attendanceServices.getStudentAttendance(studentFilters));
     } catch (requestError) {
       setError(requestError.message);
     }
@@ -517,6 +481,28 @@ function AdminAttendance() {
       setEmployeeRecords(await attendanceServices.getEmployeeAttendance(employeeFilters));
     } catch (requestError) {
       setError(requestError.message);
+    }
+  };
+
+  const saveStudentStatus = async (record) => {
+    const status = studentStatusDrafts[record._id] || record.status;
+    if (status === record.status) return;
+    setSavingId(record._id);
+    setError("");
+    setNotice("");
+    try {
+      const response = await attendanceServices.saveStudentAttendance(record._id, { status });
+      const updatedRecord = response.data;
+      setStudentsRecords((records) => records.map((item) =>
+        item._id === record._id ? updatedRecord : item
+      ));
+      setStudentStatusDrafts((drafts) => ({ ...drafts, [record._id]: updatedRecord.status }));
+      setNotice("Student attendance status updated.");
+      setSummary(await attendanceServices.getSummary());
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSavingId("");
     }
   };
 
@@ -563,7 +549,7 @@ function AdminAttendance() {
       setNotice("Employee attendance saved.");
       const [summaryData, records] = await Promise.all([
         attendanceServices.getSummary(),
-        attendanceServices.getEmployeeAttendance({ from: markDate, to: markDate }),
+        attendanceServices.getEmployeeAttendance(employeeFilters),
       ]);
       setSummary(summaryData);
       setEmployeeRecords(records);
@@ -576,15 +562,18 @@ function AdminAttendance() {
 
   const exportStudents = () => downloadCsv(
     "student-attendance.csv",
-    ["Date", "Student", "Roll number", "Attendance type / Course", "Status", "Marked by type", "Marked by", "Marked at"],
+    ["Date", "Student", "Roll number", "Course", "Status", "Marked by type", "Marked by", "Check-in", "Check-out", "Time present", "Marked at"],
     studentsRecords.map((record) => [
       record.date?.slice(0, 10),
       fullName(record.student_id),
       record.student_id?.roll_number,
       attendanceSource(record),
       STATUS_LABELS[record.status],
-      record.marked_by_type || (record.record_type === "daily" ? "student" : "teacher"),
-      record.record_type === "daily" ? "Self" : markedByName(record),
+      record.marked_by_type || "teacher",
+      markedByName(record),
+      record.check_in?.slice(0, 16),
+      record.check_out?.slice(0, 16),
+      formatDuration(record.total_minutes),
       (record.marked_at || record.created_at)?.slice(0, 16),
     ]),
   );
@@ -635,20 +624,48 @@ function AdminAttendance() {
       {tab === "students" && (
         <section className="attendance-panel">
           <div className="attendance-section-heading">
-            <div><h2>Student attendance</h2><p>Course attendance and student daily self-check-ins appear here.</p></div>
+            <div><h2>Student course attendance</h2><p>Review in/out times and adjust a student's status when needed.</p></div>
             <button type="button" className="attendance-secondary-button" disabled={!studentsRecords.length} onClick={exportStudents}>Export CSV</button>
           </div>
           <form className="attendance-filter-row admin-filter-row" onSubmit={loadStudents}>
             <label>Course<select value={studentFilters.courseId} onChange={(event) => setStudentFilters({ ...studentFilters, courseId: event.target.value })}><option value="">All courses</option>{courses.map((course) => <option key={course._id} value={course._id}>{course.courseName}</option>)}</select></label>
-            <label>From<input type="date" max={today()} value={studentFilters.from} onChange={(event) => setStudentFilters({ ...studentFilters, from: event.target.value })} /></label>
-            <label>To<input type="date" max={today()} value={studentFilters.to} onChange={(event) => setStudentFilters({ ...studentFilters, to: event.target.value })} /></label>
+            <label>From<input type="date" value={studentFilters.from} onChange={(event) => setStudentFilters({ ...studentFilters, from: event.target.value })} /></label>
+            <label>To<input type="date" value={studentFilters.to} onChange={(event) => setStudentFilters({ ...studentFilters, to: event.target.value })} /></label>
             <label>Student name<input value={studentFilters.name} onChange={(event) => setStudentFilters({ ...studentFilters, name: event.target.value })} placeholder="Search students" /></label>
-            <label>Status<select value={studentFilters.status} onChange={(event) => setStudentFilters({ ...studentFilters, status: event.target.value })}><option value="">All statuses</option>{STATUS_OPTIONS.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}</select></label>
+            <label>Student ID<input value={studentFilters.studentId} onChange={(event) => setStudentFilters({ ...studentFilters, studentId: event.target.value })} placeholder="Roll/application number or ID" /></label>
+            <label>Status<select value={studentFilters.status} onChange={(event) => setStudentFilters({ ...studentFilters, status: event.target.value })}><option value="">All statuses</option>{STATUS_OPTIONS.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}<option value="in_progress">{STATUS_LABELS.in_progress}</option></select></label>
             <button type="submit" className="attendance-primary-button">Apply filters</button>
           </form>
           <div className="attendance-table-wrap">
-            <table className="attendance-table"><thead><tr><th>Date</th><th>Student</th><th>Roll number</th><th>Attendance type / Course</th><th>Status</th><th>Marked by</th><th>Marked at</th></tr></thead>
-              <tbody>{studentsRecords.length ? studentsRecords.map((record) => <tr key={`${record.record_type || "course"}-${record._id}`}><td>{new Date(record.date).toLocaleDateString()}</td><td>{fullName(record.student_id) || "Student"}</td><td>{record.student_id?.roll_number || "—"}</td><td>{attendanceSource(record)}</td><td><span className={`attendance-status-badge ${record.status}`}>{STATUS_LABELS[record.status]}</span></td><td>{markedByLabel(record)}</td><td>{new Date(record.marked_at || record.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td></tr>) : <tr><td colSpan="7" className="attendance-empty-cell">No attendance records match these filters.</td></tr>}</tbody>
+            <table className="attendance-table student-attendance-table"><thead><tr><th>Date</th><th>Student</th><th>Roll number</th><th>Course</th><th>Status</th><th>In</th><th>Out</th><th>Time present</th><th>Marked by</th><th>Action</th></tr></thead>
+              <tbody>{studentsRecords.length ? studentsRecords.map((record) => {
+                const draftStatus = studentStatusDrafts[record._id] || record.status;
+                return <tr key={record._id}>
+                  <td>{new Date(record.date).toLocaleDateString()}</td>
+                  <td>{fullName(record.student_id) || "Student"}{record.leave_reason && <small className="attendance-leave-reason">{record.leave_reason}</small>}</td>
+                  <td>{record.student_id?.roll_number || "—"}</td>
+                  <td>{attendanceSource(record)}</td>
+                  <td>
+                    <select
+                      className={`attendance-status-select status-${draftStatus}`}
+                      value={draftStatus}
+                      aria-label={`Attendance status for ${fullName(record.student_id)}`}
+                      onChange={(event) => setStudentStatusDrafts((drafts) => ({
+                        ...drafts,
+                        [record._id]: event.target.value,
+                      }))}
+                    >
+                      {record.status === "in_progress" && <option value="in_progress" disabled>Checked in</option>}
+                      {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
+                    </select>
+                  </td>
+                  <td>{record.check_in ? new Date(record.check_in).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                  <td>{record.check_out ? new Date(record.check_out).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                  <td>{formatDuration(record.total_minutes)}</td>
+                  <td>{markedByLabel(record)}</td>
+                  <td><button type="button" className="attendance-secondary-button compact" disabled={draftStatus === record.status || savingId === record._id} onClick={() => saveStudentStatus(record)}>{savingId === record._id ? "Saving…" : "Save status"}</button></td>
+                </tr>;
+              }) : <tr><td colSpan="10" className="attendance-empty-cell">No course attendance records match these filters.</td></tr>}</tbody>
             </table>
           </div>
         </section>
@@ -685,7 +702,7 @@ function AdminAttendance() {
             </form>
             <div className="attendance-table-wrap">
               <table className="attendance-table"><thead><tr><th>Date</th><th>Employee</th><th>Employee ID</th><th>Status</th><th>Check-in</th><th>Check-out</th></tr></thead>
-                <tbody>{employeeRecords.length ? employeeRecords.map((record) => <tr key={record._id}><td>{new Date(record.date).toLocaleDateString()}</td><td>{record.employee_id?.emp_name || "—"}</td><td>{record.employee_id?.emp_id || "—"}</td><td><span className={`attendance-status-badge ${record.status}`}>{STATUS_LABELS[record.status]}</span></td><td>{record.check_in || "—"}</td><td>{record.check_out || "—"}</td></tr>) : <tr><td colSpan="6" className="attendance-empty-cell">Apply filters to view employee attendance records.</td></tr>}</tbody>
+                <tbody>{employeeRecords.length ? employeeRecords.map((record) => <tr key={record._id}><td>{new Date(record.date).toLocaleDateString()}</td><td>{record.employee_id?.emp_name || "—"}</td><td>{record.employee_id?.emp_id || "—"}</td><td><span className={`attendance-status-badge ${record.status}`}>{STATUS_LABELS[record.status]}</span></td><td>{record.check_in || "—"}</td><td>{record.check_out || "—"}</td></tr>) : <tr><td colSpan="6" className="attendance-empty-cell">No employee attendance records match these filters.</td></tr>}</tbody>
               </table>
             </div>
           </section>
@@ -713,7 +730,7 @@ function AdminAttendance() {
       {tab === "insights" && (
         <div className="attendance-insights-grid">
           <section className="attendance-panel">
-            <div className="attendance-section-heading"><div><h2>Student attendance rate</h2><p>Present and late count as attended days; leave is excluded from the denominator.</p></div></div>
+            <div className="attendance-section-heading"><div><h2>Student attendance rate</h2><p>Present and late count as attended sessions; leave and active check-ins are excluded.</p></div></div>
             <div className="attendance-rate-list">{summary?.studentPercentages?.length ? summary.studentPercentages.map((person) => <div className="attendance-rate-row" key={person.studentId}><span><strong>{person.name}</strong><small>{person.course || "Course not specified"}</small></span><strong>{person.percentage}%</strong></div>) : <p className="attendance-empty">No student attendance has been recorded.</p>}</div>
           </section>
           <section className="attendance-panel">

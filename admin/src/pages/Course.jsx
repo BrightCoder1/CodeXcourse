@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import attendanceServices from '../services/attendanceServices';
 import {
   FaPlus,
   FaSearch,
@@ -8,7 +9,8 @@ import {
   FaTrash,
   FaTimes,
   FaUserTie,
-  FaGraduationCap
+  FaGraduationCap,
+  FaUsers,
 } from 'react-icons/fa';
 
 const API_BASE_URL = 'http://localhost:4000/api/courses';
@@ -25,9 +27,19 @@ const initialFormData = {
   courseImageUrl: ''
 };
 
+const studentDisplayName = (student) =>
+  [student?.student_name, student?.middle_name, student?.last_name]
+    .filter(Boolean)
+    .join(' ') || 'Unnamed student';
+
+const studentIdentifier = (student) =>
+  student?.roll_number || student?.application_number || student?.admission_number || student?._id;
+
 const Course = () => {
   const [courses, setCourses] = useState([]);
+  const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [teacherLoadError, setTeacherLoadError] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -40,6 +52,14 @@ const Course = () => {
   // View Details Modal State
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [studentAssignmentCourse, setStudentAssignmentCourse] = useState(null);
+  const [assignmentStudents, setAssignmentStudents] = useState([]);
+  const [assignmentStudentIds, setAssignmentStudentIds] = useState([]);
+  const [assignmentSearch, setAssignmentSearch] = useState('');
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
+  const [assignmentError, setAssignmentError] = useState('');
+  const [assignmentNotice, setAssignmentNotice] = useState('');
 
   // Auth Header helper
   const getAuthHeaders = () => {
@@ -71,14 +91,89 @@ const Course = () => {
     }
   };
 
+  const fetchTeachers = async () => {
+    try {
+      const data = await attendanceServices.getAdminAssignments();
+      if (!Array.isArray(data?.teachers)) {
+        throw new Error('Registered teacher list was not returned by the server.');
+      }
+      setTeachers(data.teachers);
+    } catch (err) {
+      console.error('Fetch Teachers Error:', err);
+      setTeacherLoadError(err.message || 'Failed to load registered teachers.');
+    }
+  };
+
+  const handleOpenStudentAssignments = async (course) => {
+    const courseId = course._id || course.id;
+    setStudentAssignmentCourse(course);
+    setAssignmentStudents([]);
+    setAssignmentStudentIds([]);
+    setAssignmentSearch('');
+    setAssignmentError('');
+    setAssignmentNotice('');
+    setAssignmentLoading(true);
+    try {
+      const data = await attendanceServices.getCourseStudents(courseId);
+      if (!Array.isArray(data?.students) || !Array.isArray(data?.assignedStudentIds)) {
+        throw new Error('Student assignments were not returned by the server.');
+      }
+      setAssignmentStudents(data.students);
+      setAssignmentStudentIds(data.assignedStudentIds);
+    } catch (err) {
+      console.error('Fetch Course Students Error:', err);
+      setAssignmentError(err.message || 'Failed to load students for this course.');
+    } finally {
+      setAssignmentLoading(false);
+    }
+  };
+
+  const toggleStudentAssignment = (studentId) => {
+    setAssignmentStudentIds((current) => current.includes(studentId)
+      ? current.filter((id) => id !== studentId)
+      : [...current, studentId]);
+  };
+
+  const handleSaveStudentAssignments = async () => {
+    if (!studentAssignmentCourse) return;
+    const courseId = studentAssignmentCourse._id || studentAssignmentCourse.id;
+    setAssignmentSaving(true);
+    setAssignmentError('');
+    try {
+      const response = await attendanceServices.saveCourseStudents(courseId, {
+        studentIds: assignmentStudentIds,
+      });
+      setAssignmentNotice(response.message || 'Student course assignments updated.');
+      setStudentAssignmentCourse(null);
+    } catch (err) {
+      console.error('Save Course Students Error:', err);
+      setAssignmentError(err.message || 'Failed to update course student assignments.');
+    } finally {
+      setAssignmentSaving(false);
+    }
+  };
+
   useEffect(() => {
     fetchCourses();
+    fetchTeachers();
   }, []);
 
   // Form input handler
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleTeacherNameChange = (value) => {
+    const normalizedValue = value.trim().toLocaleLowerCase();
+    const selectedTeacher = teachers.find((teacher) =>
+      teacher.emp_name?.toLocaleLowerCase() === normalizedValue ||
+      teacher.emp_id?.toLocaleLowerCase() === normalizedValue
+    );
+    setFormData((prev) => ({
+      ...prev,
+      teacherName: selectedTeacher?.emp_name || value,
+    }));
   };
 
   // Open modal for Adding
@@ -208,6 +303,17 @@ const Course = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const assignmentQuery = assignmentSearch.trim().toLocaleLowerCase();
+  const filteredAssignmentStudents = assignmentStudents.filter((student) => {
+    if (!assignmentQuery) return true;
+    return [
+      studentDisplayName(student),
+      studentIdentifier(student),
+      student.email,
+      student._id,
+    ].filter(Boolean).join(' ').toLocaleLowerCase().includes(assignmentQuery);
+  });
+
   return (
     <div style={{ padding: '24px', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'sans-serif' }}>
       {/* Top Header & Actions Bar */}
@@ -260,6 +366,11 @@ const Course = () => {
       {errorMessage && (
         <div style={{ backgroundColor: '#fee2e2', border: '1px solid #f87171', color: '#b91c1c', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px' }}>
           {errorMessage}
+        </div>
+      )}
+      {assignmentNotice && (
+        <div role="status" style={{ backgroundColor: '#dcfce7', border: '1px solid #86efac', color: '#166534', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px' }}>
+          {assignmentNotice}
         </div>
       )}
 
@@ -365,26 +476,33 @@ const Course = () => {
                     </div>
                   </div>
 
-                  {/* Action Buttons: View, Edit, Delete */}
-                  <div style={{ marginTop: 'auto', display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '12px' }}>
+                  {/* Action Buttons: View, Edit, Students, Delete */}
+                  <div style={{ marginTop: 'auto', display: 'flex', gap: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '12px', flexWrap: 'wrap' }}>
                     <button
                       type="button"
                       onClick={() => handleOpenView(course)}
-                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '7px 0', backgroundColor: '#eff6ff', color: '#1d4ed8', border: 'none', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+                      style={{ flex: '1 1 40%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '7px 0', backgroundColor: '#eff6ff', color: '#1d4ed8', border: 'none', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
                     >
                       <FaEye /> View
                     </button>
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(course)}
-                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '7px 0', backgroundColor: '#fef3c7', color: '#b45309', border: 'none', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+                      style={{ flex: '1 1 40%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '7px 0', backgroundColor: '#fef3c7', color: '#b45309', border: 'none', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
                     >
                       <FaEdit /> Edit
                     </button>
                     <button
                       type="button"
+                      onClick={() => handleOpenStudentAssignments(course)}
+                      style={{ flex: '1 1 40%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '7px 0', backgroundColor: '#ecfeff', color: '#0e7490', border: 'none', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <FaUsers /> Students
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleDeleteCourse(courseId)}
-                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '7px 0', backgroundColor: '#fee2e2', color: '#b91c1c', border: 'none', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+                      style={{ flex: '1 1 40%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '7px 0', backgroundColor: '#fee2e2', color: '#b91c1c', border: 'none', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
                     >
                       <FaTrash /> Delete
                     </button>
@@ -457,15 +575,28 @@ const Course = () => {
               {/* Teacher & Qualification */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Teacher Name</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Teacher Name or ID</label>
                   <input
                     type="text"
-                    name="teacherName"
-                    placeholder="e.g. Dr. Rajesh Sharma"
+                    list="registered-teachers"
+                    placeholder="Type a teacher name or employee ID"
                     value={formData.teacherName}
-                    onChange={handleInputChange}
+                    onChange={(event) => handleTeacherNameChange(event.target.value)}
                     style={{ width: '100%', boxSizing: 'border-box', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
                   />
+                  <datalist id="registered-teachers">
+                    {teachers.map((teacher) => (
+                      <React.Fragment key={teacher._id}>
+                        <option value={teacher.emp_name} label={teacher.emp_id || teacher.email} />
+                        {teacher.emp_id && <option value={teacher.emp_id} label={teacher.emp_name} />}
+                      </React.Fragment>
+                    ))}
+                  </datalist>
+                  {teacherLoadError && (
+                    <small role="alert" style={{ display: 'block', marginTop: '5px', color: '#b42318' }}>
+                      {teacherLoadError}
+                    </small>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px' }}>Qualification</label>
@@ -606,6 +737,111 @@ const Course = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {studentAssignmentCourse && (
+        <div
+          onClick={() => !assignmentSaving && setStudentAssignmentCourse(null)}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '16px' }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="student-assignment-title"
+            onClick={(event) => event.stopPropagation()}
+            style={{ backgroundColor: '#fff', borderRadius: '12px', width: '100%', maxWidth: '620px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.2)' }}
+          >
+            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', padding: '18px 22px', borderBottom: '1px solid #e2e8f0' }}>
+              <div>
+                <h3 id="student-assignment-title" style={{ margin: 0, color: '#0f172a', fontSize: '1.2rem' }}>
+                  Assign students
+                </h3>
+                <p style={{ margin: '5px 0 0', color: '#64748b', fontSize: '0.9rem' }}>
+                  {studentAssignmentCourse.courseName} · {assignmentStudentIds.length} selected
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Close student assignments"
+                disabled={assignmentSaving}
+                onClick={() => setStudentAssignmentCourse(null)}
+                style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer' }}
+              >
+                <FaTimes size={18} />
+              </button>
+            </header>
+
+            <div style={{ padding: '16px 22px 0' }}>
+              <label htmlFor="student-assignment-search" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                Search students by name, ID, or email
+              </label>
+              <input
+                id="student-assignment-search"
+                type="search"
+                value={assignmentSearch}
+                onChange={(event) => setAssignmentSearch(event.target.value)}
+                placeholder="Enter a student name or ID"
+                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '7px' }}
+              />
+            </div>
+
+            {assignmentError && (
+              <p role="alert" style={{ margin: '12px 22px 0', color: '#b91c1c', backgroundColor: '#fee2e2', borderRadius: '6px', padding: '9px 12px' }}>
+                {assignmentError}
+              </p>
+            )}
+
+            <div style={{ padding: '12px 22px', overflowY: 'auto', minHeight: '160px' }}>
+              {assignmentLoading ? (
+                <p style={{ textAlign: 'center', color: '#64748b', padding: '24px 0' }}>Loading students...</p>
+              ) : filteredAssignmentStudents.length ? (
+                filteredAssignmentStudents.map((student) => (
+                    <label
+                      key={student._id}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 8px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={assignmentStudentIds.includes(student._id)}
+                        onChange={() => toggleStudentAssignment(student._id)}
+                        disabled={assignmentSaving}
+                        style={{ width: '17px', height: '17px', accentColor: '#2563eb' }}
+                      />
+                      <span style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
+                        <strong style={{ color: '#1e293b', fontSize: '0.92rem' }}>{studentDisplayName(student)}</strong>
+                        <small style={{ color: '#64748b', overflowWrap: 'anywhere' }}>
+                          {studentIdentifier(student)}{student.email ? ` · ${student.email}` : ''}
+                        </small>
+                      </span>
+                    </label>
+                ))
+              ) : (
+                <p style={{ textAlign: 'center', color: '#64748b', padding: '24px 0' }}>
+                  {assignmentStudents.length ? 'No students match your search.' : 'No students are registered yet.'}
+                </p>
+              )}
+            </div>
+
+            <footer style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '14px 22px', borderTop: '1px solid #e2e8f0' }}>
+              <button
+                type="button"
+                disabled={assignmentSaving}
+                onClick={() => setStudentAssignmentCourse(null)}
+                style={{ padding: '9px 16px', borderRadius: '7px', border: '1px solid #cbd5e1', backgroundColor: '#fff', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={assignmentLoading || assignmentSaving || Boolean(assignmentError)}
+                onClick={handleSaveStudentAssignments}
+                style={{ padding: '9px 16px', borderRadius: '7px', border: 'none', backgroundColor: '#2563eb', color: '#fff', fontWeight: 600, cursor: assignmentLoading || assignmentSaving || assignmentError ? 'not-allowed' : 'pointer', opacity: assignmentLoading || assignmentSaving || assignmentError ? 0.65 : 1 }}
+              >
+                {assignmentSaving ? 'Saving...' : 'Save assignments'}
+              </button>
+            </footer>
+          </section>
         </div>
       )}
     </div>

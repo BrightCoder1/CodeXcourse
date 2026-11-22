@@ -36,26 +36,53 @@ const parseRange = (query) => {
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const exactTextRegex = (value) => new RegExp(`^${escapeRegex(value)}$`, "i");
+const flexibleCourseNameRegex = (value) => {
+  const words = value.trim().split(/[\s_-]+/).filter(Boolean).map(escapeRegex);
+  return new RegExp(`^${words.join("[-_\\s]+")}$`, "i");
+};
 const validId = (id) => typeof id === "string" && OBJECT_ID_PATTERN.test(id);
 const validNameFilter = (value) =>
   value === undefined || (typeof value === "string" && value.trim().length <= 100);
 
+const legacyCourseMatchers = (course) => [
+  course.courseName ? flexibleCourseNameRegex(course.courseName) : null,
+  course.courseCode ? exactTextRegex(course.courseCode) : null,
+].filter(Boolean);
+
+const matchesLegacyCourseEnrollment = (studentCourse, course) =>
+  typeof studentCourse === "string" &&
+  legacyCourseMatchers(course).some((matcher) => matcher.test(studentCourse.trim()));
+
 const courseStudentQuery = (course) => {
-  const values = [course.courseName, course.courseCode]
-    .filter(Boolean)
-    .map(exactTextRegex);
-  return values.length ? { course: { $in: values } } : { _id: null };
+  const query = [];
+  if (course._id) query.push({ course_ids: course._id });
+  const legacyMatchers = legacyCourseMatchers(course);
+  if (legacyMatchers.length) {
+    query.push({
+      course_ids: { $exists: false },
+      course: { $in: legacyMatchers },
+    });
+  }
+  return query.length === 1 ? query[0] : query.length ? { $or: query } : { _id: null };
 };
 
 const enrolledCourseQuery = (courseName) => {
   if (typeof courseName !== "string" || !courseName.trim()) return { _id: null };
-  const match = exactTextRegex(courseName.trim());
-  return { $or: [{ courseName: match }, { courseCode: match }] };
+  const value = courseName.trim();
+  const query = {
+    $or: [
+      { courseName: flexibleCourseNameRegex(value) },
+      { courseCode: exactTextRegex(value) },
+    ],
+  };
+  if (validId(value)) query.$or.push({ _id: value });
+  return query;
 };
 
 module.exports = {
   courseStudentQuery,
   enrolledCourseQuery,
+  matchesLegacyCourseEnrollment,
   parseDate,
   parseRange,
   todayString,

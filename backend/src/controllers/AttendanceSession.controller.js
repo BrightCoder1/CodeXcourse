@@ -1,9 +1,6 @@
 const AttendanceSession = require("../models/AttendanceSession.model");
 const CourseAssignment = require("../models/CourseAssignment.model");
-const Student = require("../models/Student.models");
-const StudentAttendance = require("../models/StudentAttendance.model");
 const {
-  courseStudentQuery,
   parseDate,
   todayString,
   validId,
@@ -120,82 +117,7 @@ const closeAttendanceSession = async (req, res) => {
   }
 };
 
-const markSessionAbsentees = async (req, res) => {
-  try {
-    const result = await verifySessionOwner(req.params.sessionId, req.user._id);
-    if (result.error) {
-      return res.status(result.status).json({ success: false, message: result.error });
-    }
-
-    const session = result.session;
-    const now = new Date();
-    if (session.is_open && now < session.end_time) {
-      return res.status(409).json({
-        success: false,
-        message: "Close the attendance window before marking absentees.",
-      });
-    }
-    if (session.is_open) {
-      session.is_open = false;
-      await session.save();
-    }
-
-    const course = await getAssignedCourse(req.user._id, session.course_id.toString());
-    if (!course) {
-      return res.status(403).json({
-        success: false,
-        message: "This course is not assigned to your account.",
-      });
-    }
-    const students = await Student.find(courseStudentQuery(course)).select("_id");
-    const operations = students.map((student) => ({
-      updateOne: {
-        filter: {
-          student_id: student._id,
-          course_id: course._id,
-          date: session.date,
-        },
-        update: {
-          $setOnInsert: {
-            status: "absent",
-            marked_by: req.user._id,
-            marked_by_model: "User",
-            marked_by_type: "teacher",
-            marked_at: now,
-            session_id: session._id,
-            created_at: now,
-          },
-        },
-        upsert: true,
-      },
-    }));
-    let upsertedCount = 0;
-    if (operations.length) {
-      const result = await StudentAttendance.bulkWrite(operations, { ordered: true });
-      upsertedCount = result.upsertedCount;
-    }
-    return res.json({
-      success: true,
-      message: "Unmarked students were recorded as absent.",
-      count: upsertedCount,
-    });
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        message: "Attendance changed while absentees were being marked. Refresh and retry.",
-      });
-    }
-    console.error("Mark session absentees error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Unable to mark unmarked students absent.",
-    });
-  }
-};
-
 module.exports = {
   closeAttendanceSession,
-  markSessionAbsentees,
   startAttendanceSession,
 };

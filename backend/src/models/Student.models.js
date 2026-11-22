@@ -82,6 +82,10 @@ const studentSchema = new mongoose.Schema(
         academic_session: { type: String, required: true, trim: true },
         department: { type: String, required: true, trim: true },
         course: { type: String, required: true, trim: true },
+        course_ids: {
+            type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
+            default: undefined,
+        },
         specialization: { type: String, trim: true },
         semester: { type: Number, default: 1, min: 1 },
         admission_type: {

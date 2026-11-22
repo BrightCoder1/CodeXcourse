@@ -1,7 +1,8 @@
 import axios from "axios";
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 const API = axios.create({
-  baseURL: "http://localhost:4000/api/attendance",
+  baseURL: `${API_BASE_URL}/attendance`,
   withCredentials: true,
 });
 
@@ -49,19 +50,20 @@ const attendanceServices = {
       throw new Error(error.response?.data?.message || error.message || "Unable to load class roster.");
     }
   },
-  saveTeacherAttendance: (courseId, payload) =>
-    sendMutation(API.post(`/teacher/courses/${courseId}`, payload)),
   getTeacherHistory: (params) => getData("/teacher/history", params),
   startSession: (courseId, durationMinutes) =>
     sendMutation(API.post(`/teacher/courses/${courseId}/session`, { durationMinutes })),
   closeSession: (sessionId) =>
     sendMutation(API.patch(`/teacher/sessions/${sessionId}/close`)),
-  markSessionAbsentees: (sessionId) =>
-    sendMutation(API.post(`/teacher/sessions/${sessionId}/mark-absent`)),
   getAdminAssignments: () => getData("/admin/assignments"),
   saveAssignments: (payload) =>
     sendMutation(API.put("/admin/assignments", payload)),
+  getCourseStudents: (courseId) => getData(`/admin/courses/${encodeURIComponent(courseId)}/students`),
+  saveCourseStudents: (courseId, payload) =>
+    sendMutation(API.put(`/admin/courses/${encodeURIComponent(courseId)}/students`, payload)),
   getStudentAttendance: (params) => getData("/admin/students", params),
+  saveStudentAttendance: (attendanceId, payload) =>
+    sendMutation(API.put(`/admin/students/${attendanceId}`, payload)),
   getEmployeeAttendance: (params) => getData("/admin/employees", params),
   saveEmployeeAttendance: (employeeId, payload) =>
     sendMutation(API.put(`/admin/employees/${employeeId}`, payload)),

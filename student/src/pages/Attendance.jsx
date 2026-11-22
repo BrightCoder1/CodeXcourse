@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import attendanceService from '../services/attendanceService';
 import './Attendance.css';
 
@@ -7,6 +7,7 @@ const STATUS_LABELS = {
   absent: 'Absent',
   late: 'Late',
   leave: 'Leave',
+  in_progress: 'Checked in',
 };
 
 const localDateKey = (date) => {
@@ -17,7 +18,7 @@ const localDateKey = (date) => {
 };
 
 const displayTime = (value) => {
-  if (!value) return '';
+  if (!value) return '—';
   return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
@@ -26,11 +27,12 @@ const displayDate = (value) => {
   return new Date(value).toLocaleDateString();
 };
 
-const sessionIsOpen = (session, now) => Boolean(
-  session?.is_open &&
-  now >= new Date(session.start_time) &&
-  now <= new Date(session.end_time),
-);
+const formatDuration = (minutes) => {
+  const total = Number(minutes) || 0;
+  const hours = Math.floor(total / 60);
+  const remainder = total % 60;
+  return hours ? `${hours}h ${remainder}m` : `${remainder}m`;
+};
 
 function Toast({ message, type }) {
   if (!message) return null;
@@ -42,21 +44,17 @@ function Toast({ message, type }) {
   );
 }
 
-function CourseAttendanceTab({ courses, now, busyCourseId, onMark }) {
+function CourseAttendanceTab({ courses, busyCourseId, onAttendanceAction }) {
   return (
     <div className="self-course-list">
       {courses.length ? courses.map((course) => {
-        const marked = course.attendance;
-        const open = sessionIsOpen(course.session, now);
-        const markedTime = marked?.marked_at || marked?.created_at;
-        const unavailable = course.sessionStatus === 'not_started' || !course.session;
-        const message = marked
-          ? `${STATUS_LABELS[marked.status] || 'Marked'} at ${displayTime(markedTime)}`
-          : open
-            ? 'Attendance window is open'
-            : unavailable
-              ? 'Not started'
-              : 'Attendance closed';
+        const attendance = course.attendance;
+        const checkedIn = attendance?.check_in && !attendance?.check_out;
+        const hasRecord = Boolean(attendance && !checkedIn);
+        const status = attendance?.status || 'ready';
+        const message = attendance
+          ? `${STATUS_LABELS[attendance.status] || 'Marked'}${attendance.total_minutes ? ` · ${formatDuration(attendance.total_minutes)}` : ''}`
+          : 'Ready to check in anytime';
 
         return (
           <article className="self-course-card" key={course._id}>
@@ -68,28 +66,49 @@ function CourseAttendanceTab({ courses, now, busyCourseId, onMark }) {
                   <span className="self-course-code">{course.courseCode}</span>
                 </div>
                 <p>{course.teacherName || course.instructorName || 'Course instructor'}</p>
-                <span className={`self-window-state ${marked ? 'marked' : open ? 'open' : 'closed'}`}>
+                <span className={`self-window-state ${status}`}>
                   <span className="state-dot" />
-                  {marked ? 'Already marked' : open ? 'Attendance open' : message}
+                  {checkedIn
+                    ? `${STATUS_LABELS[attendance.status] || 'Checked in'} — check out to finish attendance`
+                    : message}
                 </span>
+                {attendance && (
+                  <div className="self-course-time-details">
+                    <span>In: {displayTime(attendance.check_in)}</span>
+                    <span>Out: {displayTime(attendance.check_out)}</span>
+                    <span>Total: {formatDuration(attendance.total_minutes)}</span>
+                    {attendance.leave_reason && <span>Leave reason: {attendance.leave_reason}</span>}
+                  </div>
+                )}
               </div>
             </div>
             <div className="self-course-action">
-              {marked ? (
-                <div className="self-marked-confirmation">
+              {hasRecord ? (
+                <div className={`self-marked-confirmation ${status}`}>
                   <span className="self-marked-check" aria-hidden="true">✓</span>
-                  <span>{message}</span>
+                  <span>{STATUS_LABELS[attendance.status] || 'Attendance complete'}</span>
                 </div>
               ) : (
                 <>
-                  {!open && <span className="self-closed-reason">{message}</span>}
                   <button
                     type="button"
                     className="self-attendance-button"
-                    disabled={!open || busyCourseId === course._id}
-                    onClick={() => onMark(course)}
+                    disabled={Boolean(checkedIn) || busyCourseId === course._id}
+                    onClick={() => onAttendanceAction(course, 'check-in')}
                   >
-                    {busyCourseId === course._id ? 'Saving…' : 'Mark present'}
+                    {busyCourseId === course._id
+                      ? 'Saving…'
+                      : checkedIn
+                        ? 'Checked in'
+                        : 'Check in'}
+                  </button>
+                  <button
+                    type="button"
+                    className="self-attendance-button checkout"
+                    disabled={!checkedIn || busyCourseId === course._id}
+                    onClick={() => onAttendanceAction(course, 'check-out')}
+                  >
+                    {busyCourseId === course._id ? 'Saving…' : 'Check out'}
                   </button>
                 </>
               )}
@@ -109,7 +128,7 @@ function CourseAttendanceTab({ courses, now, busyCourseId, onMark }) {
 
 function AttendanceCalendar({ records, selectedCourseId, month, onMonthChange }) {
   const statusesByDate = useMemo(() => {
-    const priority = { leave: 0, absent: 1, late: 2, present: 3 };
+    const priority = { leave: 0, absent: 1, late: 2, present: 3, in_progress: 4 };
     const statuses = new Map();
     records
       .filter((record) => !selectedCourseId || record.course_id?._id === selectedCourseId)
@@ -161,7 +180,7 @@ function AttendanceCalendar({ records, selectedCourseId, month, onMonthChange })
         })}
       </div>
       <div className="self-calendar-legend">
-        {['present', 'absent', 'late'].map((status) => (
+        {['present', 'absent', 'late', 'leave'].map((status) => (
           <span key={status}><i className={status} />{STATUS_LABELS[status]}</span>
         ))}
       </div>
@@ -171,41 +190,37 @@ function AttendanceCalendar({ records, selectedCourseId, month, onMonthChange })
 
 export default function Attendance() {
   const [activeTab, setActiveTab] = useState('courses');
-  const [dashboard, setDashboard] = useState({ courses: [], dailyAttendance: null });
-  const [history, setHistory] = useState({
-    courseAttendance: [],
-    dailyAttendance: [],
-    percentages: [],
-    dailyPercentage: 0,
-  });
+  const [dashboard, setDashboard] = useState({ courses: [] });
+  const [history, setHistory] = useState({ courseAttendance: [], percentages: [] });
   const [filters, setFilters] = useState({ from: '', to: '', courseId: '' });
   const [appliedFilters, setAppliedFilters] = useState({ from: '', to: '', courseId: '' });
   const [historyRefresh, setHistoryRefresh] = useState(0);
+  const [dashboardRefresh, setDashboardRefresh] = useState(0);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
-  const [now, setNow] = useState(() => new Date());
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [busyCourseId, setBusyCourseId] = useState('');
-  const [dailyBusy, setDailyBusy] = useState(false);
+  const [busyLeave, setBusyLeave] = useState(false);
+  const [leaveForm, setLeaveForm] = useState(() => ({
+    courseId: '',
+    date: localDateKey(new Date()),
+    reason: '',
+  }));
   const [toast, setToast] = useState({ message: '', type: 'success' });
 
   const showToast = (message, type = 'success') => setToast({ message, type });
-  const loadDashboard = useCallback(async () => {
-    setLoadingDashboard(true);
-    try {
-      setDashboard(await attendanceService.getDashboard());
-    } catch (error) {
-      showToast(error.message, 'error');
-    } finally {
-      setLoadingDashboard(false);
-    }
-  }, []);
 
   useEffect(() => {
     let active = true;
     attendanceService.getDashboard()
       .then((data) => {
-        if (active) setDashboard(data);
+        if (active) {
+          setDashboard(data);
+          setLeaveForm((form) => ({
+            ...form,
+            courseId: form.courseId || data.courses?.[0]?._id || '',
+          }));
+        }
       })
       .catch((error) => {
         if (active) showToast(error.message, 'error');
@@ -214,7 +229,7 @@ export default function Attendance() {
         if (active) setLoadingDashboard(false);
       });
     return () => { active = false; };
-  }, []);
+  }, [dashboardRefresh]);
 
   useEffect(() => {
     let active = true;
@@ -232,11 +247,6 @@ export default function Attendance() {
   }, [appliedFilters, historyRefresh]);
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => setNow(new Date()), 15000);
-    return () => window.clearInterval(intervalId);
-  }, []);
-
-  useEffect(() => {
     if (!toast.message) return undefined;
     const timeoutId = window.setTimeout(
       () => setToast({ message: '', type: 'success' }),
@@ -245,57 +255,58 @@ export default function Attendance() {
     return () => window.clearTimeout(timeoutId);
   }, [toast]);
 
-  const markCourse = async (course) => {
+  const refreshAttendance = () => {
+    setLoadingDashboard(true);
+    setLoadingHistory(true);
+    setDashboardRefresh((version) => version + 1);
+    setHistoryRefresh((version) => version + 1);
+  };
+
+  const markCourseAttendance = async (course, action) => {
     setBusyCourseId(course._id);
     setToast({ message: '', type: 'success' });
     try {
-      await attendanceService.markCoursePresent(course._id);
-      showToast(`${course.courseName}: attendance marked present.`);
-      await loadDashboard();
-      setLoadingHistory(true);
-      setHistoryRefresh((version) => version + 1);
+      await attendanceService.markCourseAttendance(course._id, action);
+      showToast(action === 'check-in'
+        ? `${course.courseName}: checked in. Check out to count your time.`
+        : `${course.courseName}: checked out and attendance time recorded.`);
+      refreshAttendance();
     } catch (error) {
       showToast(error.message, 'error');
-      if (error.message === 'Attendance already marked' ||
-          error.message === 'Attendance window is closed') {
-        await loadDashboard();
-      }
+      refreshAttendance();
     } finally {
       setBusyCourseId('');
     }
   };
 
-  const markDaily = async () => {
-    if (!window.confirm('Mark your daily attendance for today? This can only be done once.')) return;
-    setDailyBusy(true);
+  const applyLeave = async (event) => {
+    event.preventDefault();
+    setBusyLeave(true);
     setToast({ message: '', type: 'success' });
     try {
-      const record = await attendanceService.markDailyPresent();
-      showToast(`Daily attendance marked at ${displayTime(record.marked_at)}.`);
-      await loadDashboard();
-      setLoadingHistory(true);
-      setHistoryRefresh((version) => version + 1);
+      await attendanceService.applyCourseLeave(leaveForm.courseId, {
+        date: leaveForm.date,
+        reason: leaveForm.reason,
+      });
+      showToast('Leave application submitted.');
+      setLeaveForm((form) => ({ ...form, reason: '' }));
+      refreshAttendance();
     } catch (error) {
       showToast(error.message, 'error');
-      if (error.message === 'Attendance already marked') await loadDashboard();
     } finally {
-      setDailyBusy(false);
+      setBusyLeave(false);
     }
   };
 
   const courses = dashboard.courses || [];
-  const dailyAttendance = dashboard.dailyAttendance;
-  const todayKey = dashboard.date || localDateKey(now);
+  const todayKey = dashboard.date || leaveForm.date;
   const todayCourseRecords = history.courseAttendance.filter((record) =>
     record.date.slice(0, 10) === todayKey
   );
-  const todayPresent = todayCourseRecords.filter((record) => record.status === 'present').length;
-  const overallPercentage = history.percentages.length
-    ? Math.round(
-      history.percentages.reduce((sum, item) => sum + item.percentage, 0) /
-      history.percentages.length,
-    )
-    : 0;
+  const todayCompleted = todayCourseRecords.filter((record) =>
+    record.status === 'present' || record.status === 'late'
+  ).length;
+  const todayMinutes = todayCourseRecords.reduce((total, record) => total + (record.total_minutes || 0), 0);
   const applyHistoryFilters = (event) => {
     event.preventDefault();
     setLoadingHistory(true);
@@ -308,7 +319,7 @@ export default function Attendance() {
         <div>
           <span className="self-attendance-eyebrow">STUDENT PORTAL</span>
           <h1>My attendance</h1>
-          <p>Mark attendance during your class window and keep track of your history.</p>
+          <p>Check in and check out for each course at any time today. Time is counted after checkout.</p>
         </div>
         <div className="self-attendance-date-card">
           <span>Today</span>
@@ -325,60 +336,69 @@ export default function Attendance() {
         </article>
         <article className="self-overview-card">
           <span className="self-overview-icon green">✓</span>
-          <div><strong>{todayPresent}</strong><span>Course sessions attended today</span></div>
+          <div><strong>{todayCompleted}</strong><span>Completed course sessions</span></div>
         </article>
         <article className="self-overview-card">
-          <span className="self-overview-icon orange">%</span>
-          <div><strong>{overallPercentage}%</strong><span>Average attendance</span></div>
+          <span className="self-overview-icon orange">◷</span>
+          <div><strong>{formatDuration(todayMinutes)}</strong><span>Time recorded today</span></div>
         </article>
       </div>
 
       <nav className="self-attendance-tabs" aria-label="Attendance options">
         <button type="button" className={activeTab === 'courses' ? 'active' : ''} onClick={() => setActiveTab('courses')}>Course attendance</button>
-        <button type="button" className={activeTab === 'daily' ? 'active' : ''} onClick={() => setActiveTab('daily')}>My daily attendance</button>
         <button type="button" className={activeTab === 'history' ? 'active' : ''} onClick={() => setActiveTab('history')}>History & calendar</button>
       </nav>
 
       {activeTab === 'courses' && (
         <section className="self-attendance-panel">
           <div className="self-panel-heading">
-            <div><h2>Course attendance</h2><p>Your teacher opens attendance for a limited time during class.</p></div>
+            <div><h2>Course attendance</h2><p>No attendance window is needed. Check in when you start and check out when you finish.</p></div>
             <span className="self-panel-date">{new Date(`${todayKey}T12:00:00`).toLocaleDateString()}</span>
           </div>
+          <form className="self-leave-form" onSubmit={applyLeave}>
+            <h3>Apply for course leave</h3>
+            <label>
+              Course
+              <select
+                required
+                value={leaveForm.courseId}
+                onChange={(event) => setLeaveForm({ ...leaveForm, courseId: event.target.value })}
+              >
+                {courses.map((course) => <option key={course._id} value={course._id}>{course.courseName}</option>)}
+              </select>
+            </label>
+            <label>
+              Leave date
+              <input
+                required
+                type="date"
+                min={todayKey}
+                value={leaveForm.date}
+                onChange={(event) => setLeaveForm({ ...leaveForm, date: event.target.value })}
+              />
+            </label>
+            <label className="self-leave-reason">
+              Reason
+              <textarea
+                required
+                maxLength={500}
+                value={leaveForm.reason}
+                onChange={(event) => setLeaveForm({ ...leaveForm, reason: event.target.value })}
+                placeholder="Briefly explain your leave request"
+              />
+            </label>
+            <button type="submit" className="self-filter-button" disabled={!courses.length || busyLeave}>
+              {busyLeave ? 'Submitting…' : 'Submit leave'}
+            </button>
+          </form>
           {loadingDashboard ? (
             <div className="self-loading" role="status"><span className="self-spinner" />Loading your courses…</div>
           ) : (
             <CourseAttendanceTab
               courses={courses}
-              now={now}
               busyCourseId={busyCourseId}
-              onMark={markCourse}
+              onAttendanceAction={markCourseAttendance}
             />
-          )}
-        </section>
-      )}
-
-      {activeTab === 'daily' && (
-        <section className="self-attendance-panel self-daily-panel">
-          <div className="self-panel-heading">
-            <div><h2>My daily attendance</h2><p>Mark your presence at the institute once per day.</p></div>
-            <span className="self-panel-date">{history.dailyPercentage}% recorded-day attendance</span>
-          </div>
-          {loadingDashboard ? (
-            <div className="self-loading" role="status"><span className="self-spinner" />Checking today&apos;s attendance…</div>
-          ) : dailyAttendance ? (
-            <div className="self-daily-marked">
-              <span className="self-daily-check" aria-hidden="true">✓</span>
-              <div><strong>Daily attendance marked</strong><span>Marked at {displayTime(dailyAttendance.marked_at)}</span></div>
-              <span className="self-daily-badge">Present</span>
-            </div>
-          ) : (
-            <div className="self-daily-action">
-              <div><strong>You have not marked attendance today</strong><span>This action is available once each day.</span></div>
-              <button type="button" className="self-attendance-button" disabled={dailyBusy} onClick={markDaily}>
-                {dailyBusy ? 'Saving…' : 'Mark my attendance'}
-              </button>
-            </div>
           )}
         </section>
       )}
@@ -387,11 +407,11 @@ export default function Attendance() {
         <div className="self-history-layout">
           <section className="self-attendance-panel self-history-main">
             <div className="self-panel-heading">
-              <div><h2>Attendance history</h2><p>Course-wise and daily records for your account.</p></div>
+              <div><h2>Course attendance history</h2><p>Review each course status, check-in/out, and recorded time.</p></div>
             </div>
             <form className="self-history-filters" onSubmit={applyHistoryFilters}>
-              <label>From<input type="date" max={localDateKey(now)} value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} /></label>
-              <label>To<input type="date" max={localDateKey(now)} value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} /></label>
+              <label>From<input type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} /></label>
+              <label>To<input type="date" value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} /></label>
               <label>Course<select value={filters.courseId} onChange={(event) => setFilters({ ...filters, courseId: event.target.value })}><option value="">All courses</option>{courses.map((course) => <option key={course._id} value={course._id}>{course.courseName}</option>)}</select></label>
               <button type="submit" className="self-filter-button" disabled={loadingHistory}>{loadingHistory ? 'Loading…' : 'Apply filter'}</button>
             </form>
@@ -403,7 +423,7 @@ export default function Attendance() {
                 <div className="self-percentage-list">
                   {history.percentages.map((item) => (
                     <div className="self-percentage-card" key={item.courseId}>
-                      <span><strong>{item.courseName}</strong><small>{item.attended} of {item.eligible} marked days attended</small></span>
+                      <span><strong>{item.courseName}</strong><small>{item.attended} of {item.eligible} completed sessions · {formatDuration(item.totalMinutes)} recorded</small></span>
                       <strong>{item.percentage}%</strong>
                     </div>
                   ))}
@@ -412,32 +432,20 @@ export default function Attendance() {
 
                 <div className="self-history-table-wrap">
                   <table className="self-history-table">
-                    <thead><tr><th>Date</th><th>Type / Course</th><th>Status</th><th>Marked at</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Course</th><th>Status</th><th>In</th><th>Out</th><th>Time</th></tr></thead>
                     <tbody>
-                      {[
-                        ...history.courseAttendance.map((record) => ({
-                          id: record._id,
-                          date: record.date,
-                          label: record.course_id?.courseName || 'Course attendance',
-                          status: record.status,
-                          markedAt: record.marked_at || record.created_at,
-                        })),
-                        ...history.dailyAttendance.map((record) => ({
-                          id: `daily-${record._id}`,
-                          date: record.date,
-                          label: 'Daily attendance',
-                          status: record.status,
-                          markedAt: record.marked_at,
-                        })),
-                      ].map((record) => (
-                        <tr key={record.id}>
-                          <td>{displayDate(record.date)}</td><td>{record.label}</td>
+                      {history.courseAttendance.map((record) => (
+                        <tr key={record._id}>
+                          <td>{displayDate(record.date)}</td>
+                          <td>{record.course_id?.courseName || 'Course attendance'}{record.leave_reason && <small className="attendance-leave-reason">{record.leave_reason}</small>}</td>
                           <td><span className={`self-history-status ${record.status}`}>{STATUS_LABELS[record.status] || record.status}</span></td>
-                          <td>{displayTime(record.markedAt)}</td>
+                          <td>{displayTime(record.check_in)}</td>
+                          <td>{displayTime(record.check_out)}</td>
+                          <td>{formatDuration(record.total_minutes)}</td>
                         </tr>
                       ))}
-                      {!history.courseAttendance.length && !history.dailyAttendance.length && (
-                        <tr><td colSpan="4" className="self-history-empty">No attendance records found.</td></tr>
+                      {!history.courseAttendance.length && (
+                        <tr><td colSpan="6" className="self-history-empty">No course attendance records found.</td></tr>
                       )}
                     </tbody>
                   </table>

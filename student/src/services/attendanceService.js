@@ -29,9 +29,16 @@ const queryString = (params) => {
 const attendanceService = {
   getDashboard: () => request('/student'),
   getHistory: (filters) => request(`/student/history${queryString(filters)}`),
-  markCoursePresent: (courseId) =>
-    request(`/student/courses/${encodeURIComponent(courseId)}/mark`, { method: 'POST' }),
-  markDailyPresent: () => request('/student/daily', { method: 'POST' }),
+  markCourseAttendance: (courseId, action) =>
+    request(`/student/courses/${encodeURIComponent(courseId)}/mark`, {
+      method: 'POST',
+      body: JSON.stringify({ action }),
+    }),
+  applyCourseLeave: (courseId, payload) =>
+    request(`/student/courses/${encodeURIComponent(courseId)}/leave`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 };
 
 export default attendanceService;

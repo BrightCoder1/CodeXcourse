@@ -1,0 +1,22 @@
+.course-attendance-timeline {
+  display: flex;
+  width: 100%;
+  height: 12px;
+  gap: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted, #e5e7eb);
+}
+
+.course-attendance-segment {
+  min-width: 1px;
+  flex: 1 1 0;
+  border-radius: 999px;
+}
+
+.course-attendance-segment.present { background: #16a34a; }
+.course-attendance-segment.absent { background: #dc2626; }
+.course-attendance-segment.late { background: #d97706; }
+.course-attendance-segment.leave { background: #7c3aed; }
+.course-attendance-segment.in_progress { background: #0284c7; }
+.course-attendance-segment.unmarked { background: #9ca3af; }
