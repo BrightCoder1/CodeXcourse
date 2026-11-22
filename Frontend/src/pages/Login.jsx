@@ -1,17 +1,35 @@
 import React, { useState } from "react";
+import axios from "axios";
 import { NavLink } from "react-router-dom";
 // import "./Login.css";
+
+const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:4000/api").replace(/\/$/, "");
+const STUDENT_APP_URL = import.meta.env.VITE_STUDENT_APP_URL || "http://localhost:5174/";
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage("");
+    setIsLoading(true);
 
-    console.log("Email:", email);
-    console.log("Password:", password);
+    try {
+      await axios.post(
+        `${API_URL}/student/login`,
+        { email: email.trim(), password },
+        { withCredentials: true },
+      );
+      window.location.assign(STUDENT_APP_URL);
+    } catch (error) {
+      setErrorMessage(
+        error.response?.data?.message || "Unable to log in. Please try again.",
+      );
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -34,6 +52,7 @@ function Login() {
               placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               required
             />
           </div>
@@ -47,6 +66,7 @@ function Login() {
               placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
               required
             />
           </div>
@@ -63,8 +83,10 @@ function Login() {
             
           </div>
 
-          <button type="submit" className="login-btn">
-            Login
+          {errorMessage && <p role="alert">{errorMessage}</p>}
+
+          <button type="submit" className="login-btn" disabled={isLoading}>
+            {isLoading ? "Logging in..." : "Login"}
           </button>
 
         </form>

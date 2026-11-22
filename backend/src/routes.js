@@ -14,6 +14,14 @@ const {
 } = require("./controllers/User.controller.js");
 
 const adminAuth = require("./middleware/adminAuth.js");
+const studentAuth = require("./middleware/studentAuth.js");
+const {
+  studentLogin,
+  getStudentProfile,
+  getStudentFees,
+  updateStudentProfile,
+  studentLogout
+} = require("./controllers/StudentDash.controller.js");
 const {
   student_register,
   getAllStudents,
@@ -49,6 +57,11 @@ router.delete("/delete", adminAuth, deleteProfile);
 
 
 // Student Routes
+router.post("/student/login", studentLogin);
+router.post("/student/logout", studentAuth, studentLogout);
+router.get("/student/profile", studentAuth, getStudentProfile);
+router.get("/student/fees", studentAuth, getStudentFees);
+router.put("/student/profile", studentAuth, updateStudentProfile);
 router.post("/register/student", adminAuth, student_register);
 router.get('/student', adminAuth, getAllStudents);
 router.get('/student/count', adminAuth, getStudentCount);

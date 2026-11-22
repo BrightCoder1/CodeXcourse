@@ -1,53 +1,70 @@
+import { useEffect, useState } from 'react';
 import Icon from '../components/Icon';
 import './Fees.css';
 
-const feePayments = [
-  {
-    id: 'FEE-2026-1048',
-    title: 'Course fee - installment 1',
-    amount: 18000,
-    dueDate: '20 Oct 2026',
-    paidDate: '20 Oct 2026',
-    status: 'Paid',
-    paymentMethod: 'UPI',
-  },
-  {
-    id: 'FEE-2026-1049',
-    title: 'Course fee - installment 2',
-    amount: 12000,
-    dueDate: '01 Dec 2026',
-    paidDate: null,
-    status: 'Pending',
-    paymentMethod: null,
-  },
-];
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/$/, '');
+const LOGIN_URL = import.meta.env.VITE_PUBLIC_APP_URL || 'http://localhost:5173/login';
 
-const student = {
-  name: 'Rahul Bhola',
-  course: 'Full Stack MERN Bootcamp',
-  totalFee: 30000,
+const formatAmount = (amount) => (
+  `INR ${Number(amount || 0).toLocaleString('en-IN')}`
+);
+
+const formatDate = (dateValue) => {
+  if (!dateValue) return '—';
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return '—';
+
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
 };
 
-const formatAmount = (amount) => `INR ${amount.toLocaleString('en-IN')}`;
+const formatSubmissionDateTime = (dateValue) => {
+  if (!dateValue) return 'Not recorded';
 
-const escapePdfText = (value) => value
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return 'Not recorded';
+
+  return `${new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata',
+  }).format(date)} IST`;
+};
+
+const escapePdfText = (value) => String(value)
   .replace(/[^\x20-\x7E]/g, '')
   .replace(/([\\()])/g, '\\$1');
 
-const createReceiptPdf = (payment) => {
+const createReceiptPdf = (payment, student, studentName) => {
+  const totalFee = Number(payment.total_fee ?? student.total_fee) || 0;
+  const balance = Number(payment.pending_amount ?? student.pending_amount) || 0;
   const lines = [
     'CodeXCourse',
     'FEE PAYMENT RECEIPT',
-    `Receipt number: ${payment.id}`,
-    `Student: ${student.name}`,
-    `Course: ${student.course}`,
-    `Description: ${payment.title}`,
+    `Receipt number: ${payment.receipt_number || 'Not available'}`,
+    `Student: ${studentName}`,
+    `Email: ${student.email || 'Not available'}`,
+    `Application number: ${student.application_number || 'Not available'}`,
+    `Course: ${student.course || 'Not available'}`,
     `Amount paid: ${formatAmount(payment.amount)}`,
-    `Payment date: ${payment.paidDate}`,
-    `Payment method: ${payment.paymentMethod}`,
-    `Fee due date: ${payment.dueDate}`,
-    `Total course fee: ${formatAmount(student.totalFee)}`,
+    `Fee submission date/time: ${formatSubmissionDateTime(payment.paid_at)}`,
+    `Payment method: ${payment.payment_method || 'Not available'}`,
+    `Received by: ${payment.received_by || 'Not available'}`,
+    `Total course fee: ${formatAmount(totalFee)}`,
+    `Balance after payment: ${formatAmount(balance)}`,
+    ...(payment.remark ? [`Remark: ${payment.remark}`] : []),
     'Status: PAID',
+    'Signature: ____________________________________',
     'This is a digitally generated receipt.',
   ];
 
@@ -80,23 +97,107 @@ const createReceiptPdf = (payment) => {
   return new Blob([pdf], { type: 'application/pdf' });
 };
 
-const downloadReceipt = (payment) => {
-  const receiptUrl = URL.createObjectURL(createReceiptPdf(payment));
+const downloadReceipt = (payment, student, studentName) => {
+  const receiptUrl = URL.createObjectURL(createReceiptPdf(payment, student, studentName));
   const downloadLink = document.createElement('a');
   downloadLink.href = receiptUrl;
-  downloadLink.download = `${payment.id}-receipt.pdf`;
+  downloadLink.download = `${payment.receipt_number || 'fee-receipt'}.pdf`;
   document.body.appendChild(downloadLink);
   downloadLink.click();
   downloadLink.remove();
   window.setTimeout(() => URL.revokeObjectURL(receiptUrl), 1000);
 };
 
-export default function Fees() {
-  const paidAmount = feePayments
-    .filter((payment) => payment.status === 'Paid')
-    .reduce((total, payment) => total + payment.amount, 0);
-  const pendingAmount = student.totalFee - paidAmount;
-  const paidPayments = feePayments.filter((payment) => payment.status === 'Paid');
+export default function Fees({ student }) {
+  const [feeStudent, setFeeStudent] = useState(student);
+  const [isRefreshing, setIsRefreshing] = useState(true);
+  const [refreshError, setRefreshError] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    let isActive = true;
+    let isFetching = false;
+
+    const loadFees = async () => {
+      if (isFetching) return;
+      isFetching = true;
+
+      try {
+        const response = await fetch(`${API_URL}/student/fees`, {
+          credentials: 'include',
+        });
+        const data = await response.json();
+
+        if (response.status === 401 || response.status === 403) {
+          window.location.assign(LOGIN_URL);
+          return;
+        }
+        if (!response.ok || !data.success || !data.student) {
+          throw new Error(data.message || 'Unable to refresh your fee details.');
+        }
+        if (isActive) {
+          setFeeStudent(data.student);
+          setRefreshError('');
+        }
+      } catch (error) {
+        if (isActive) {
+          setRefreshError(error.message || 'Unable to refresh your fee details.');
+        }
+      } finally {
+        isFetching = false;
+        if (isActive) {
+          setIsRefreshing(false);
+        }
+      }
+    };
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        loadFees();
+      }
+    };
+
+    loadFees();
+    const intervalId = window.setInterval(refreshWhenVisible, 10000);
+    window.addEventListener('focus', loadFees);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', loadFees);
+    };
+  }, [retryCount]);
+
+  const studentDetails = feeStudent || student;
+  const studentName = [
+    studentDetails.student_name,
+    studentDetails.middle_name,
+    studentDetails.last_name,
+  ]
+    .filter(Boolean)
+    .join(' ') || 'Student';
+  const payments = Array.isArray(studentDetails.payment_history)
+    ? [...studentDetails.payment_history].sort(
+      (first, second) => new Date(second.paid_at || 0) - new Date(first.paid_at || 0),
+    )
+    : [];
+  const totalFee = Number(studentDetails.total_fee) || 0;
+  const historyPaidAmount = payments.reduce(
+    (total, payment) => total + (Number(payment.amount) || 0),
+    0,
+  );
+  const paidAmount = Number(studentDetails.paid_amount) || historyPaidAmount;
+  const pendingAmount = Math.max(totalFee - paidAmount, 0);
+  const paymentStatus = pendingAmount === 0 && totalFee > 0
+    ? 'Paid'
+    : paidAmount > 0
+      ? 'Partial'
+      : 'Pending';
+  const statusClass = paymentStatus === 'Paid' ? 'paid' : 'pending';
+  const refreshFees = () => {
+    setIsRefreshing(true);
+    setRetryCount((count) => count + 1);
+  };
 
   return (
     <section className="fees-page">
@@ -108,16 +209,28 @@ export default function Fees() {
         </div>
         <span className="fees-account-name">
           <Icon name="user" size={18} />
-          {student.name}
+          {studentName}
         </span>
       </header>
+
+      {refreshError && (
+        <div className="fees-refresh-error" role="alert">
+          <span>{refreshError}</span>
+          <button type="button" onClick={refreshFees}>
+            Retry
+          </button>
+        </div>
+      )}
+      {!refreshError && isRefreshing && (
+        <p className="fees-refresh-status" role="status">Loading latest fee details...</p>
+      )}
 
       <div className="fees-summary-grid">
         <article className="fees-summary-card">
           <span className="fees-summary-icon total"><Icon name="credit-card" size={21} /></span>
           <div>
             <p>Total course fee</p>
-            <strong>{formatAmount(student.totalFee)}</strong>
+            <strong>{formatAmount(totalFee)}</strong>
           </div>
         </article>
         <article className="fees-summary-card">
@@ -139,52 +252,83 @@ export default function Fees() {
       <section className="fees-panel" aria-labelledby="fee-records-heading">
         <div className="fees-panel-heading">
           <div>
-            <h2 id="fee-records-heading">Fee records</h2>
-            <p>{student.course}</p>
+            <h2 id="fee-records-heading">Submitted Fee Payments</h2>
+            <p>{studentDetails.course || 'Course not assigned'}</p>
           </div>
-          <span className="fees-balance-status">Partially paid</span>
+          <div className="fees-panel-actions">
+            <span className={`fees-balance-status ${statusClass}`}>{paymentStatus}</span>
+            <button
+              className="fees-refresh-btn"
+              type="button"
+              onClick={refreshFees}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
         </div>
 
-        <div className="fees-record-list">
-          {feePayments.map((payment) => (
-            <article className="fees-record" key={payment.id}>
-              <span className={`fees-record-icon ${payment.status.toLowerCase()}`}>
-                <Icon name={payment.status === 'Paid' ? 'check-circle' : 'clock'} size={21} />
-              </span>
-              <div className="fees-record-main">
-                <div className="fees-record-title">
-                  <h3>{payment.title}</h3>
-                  <span className={`fees-status ${payment.status.toLowerCase()}`}>{payment.status}</span>
-                </div>
-                <div className="fees-record-meta">
-                  <span>Due {payment.dueDate}</span>
-                  {payment.paidDate && <span>Paid {payment.paidDate} · {payment.paymentMethod}</span>}
-                </div>
-              </div>
-              <strong className="fees-record-amount">{formatAmount(payment.amount)}</strong>
-              {payment.status === 'Paid' ? (
-                <button
-                  type="button"
-                  className="fees-download-btn"
-                  onClick={() => downloadReceipt(payment)}
-                  aria-label={`Download receipt for ${payment.title}`}
-                >
-                  <Icon name="download" size={17} />
-                  <span>Download slip</span>
-                </button>
-              ) : (
-                <span className="fees-no-receipt">No slip yet</span>
-              )}
-            </article>
-          ))}
-        </div>
+        {payments.length > 0 ? (
+          <div className="fees-table-wrap">
+            <table className="fees-table">
+              <thead>
+                <tr>
+                  <th scope="col">Receipt ID</th>
+                  <th scope="col">Student</th>
+                  <th scope="col">Course</th>
+                  <th scope="col">Paid Amount</th>
+                  <th scope="col">Pending Due</th>
+                  <th scope="col">Payment Mode</th>
+                  <th scope="col">Received By</th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Receipt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((payment, index) => {
+                  const receiptNumber = payment.receipt_number || `payment-${index + 1}`;
+                  const balance = Number(payment.pending_amount ?? pendingAmount);
+
+                  return (
+                    <tr key={receiptNumber}>
+                      <td className="fees-receipt-id">{receiptNumber}</td>
+                      <td>
+                        <strong>{studentName}</strong>
+                        <small>{studentDetails.roll_number || studentDetails.application_number || '—'}</small>
+                      </td>
+                      <td>{studentDetails.course || '—'}</td>
+                      <td className="fees-table-amount">{formatAmount(payment.amount)}</td>
+                      <td className="fees-table-balance">{formatAmount(Number.isFinite(balance) ? balance : pendingAmount)}</td>
+                      <td>{payment.payment_method || '—'}</td>
+                      <td>{payment.received_by || '—'}</td>
+                      <td>{formatDate(payment.paid_at)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="fees-download-btn"
+                          onClick={() => downloadReceipt(payment, studentDetails, studentName)}
+                          aria-label={`Download receipt ${receiptNumber}`}
+                        >
+                          <Icon name="download" size={17} />
+                          <span>PDF Slip</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="fees-list-empty" role="status">
+            <p>No fee payments have been recorded for this student account yet.</p>
+            <p>Payments submitted by admin will appear here automatically.</p>
+          </div>
+        )}
       </section>
 
-      <p className="fees-demo-note">
-        These are sample fee records. Live balances and receipts require a student account connected to the fee system.
-      </p>
       <span className="sr-only" aria-live="polite">
-        {paidPayments.length} paid fee record{paidPayments.length === 1 ? '' : 's'} available for receipt download.
+        {payments.length} paid fee record{payments.length === 1 ? '' : 's'} available for receipt download.
       </span>
     </section>
   );

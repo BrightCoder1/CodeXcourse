@@ -2,7 +2,10 @@ import React from 'react';
 import Icon from '../components/Icon';
 import './StudentDashboard.css';
 
-const StudentDashboard = () => {
+const StudentDashboard = ({ student }) => {
+  const studentName = [student?.student_name, student?.middle_name, student?.last_name]
+    .filter(Boolean)
+    .join(' ') || 'Student';
   const stats = [
     { title: 'Enrolled Courses', value: '4', icon: 'shopping-bag', color: '#4f22b3' },
     { title: 'Completed', value: '2', icon: 'check-circle', color: '#16a34a' },
@@ -31,7 +34,7 @@ const StudentDashboard = () => {
     <div className="student-dashboard">
       <header className="dashboard-header">
         <div>
-          <h2>Welcome back, Student! 👋</h2>
+          <h2>Welcome back, {studentName}! 👋</h2>
           <p>Track your learning progress and pick up where you left off.</p>
         </div>
       </header>

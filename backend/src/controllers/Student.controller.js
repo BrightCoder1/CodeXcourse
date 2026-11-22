@@ -4,6 +4,7 @@ const { randomBytes } = require('crypto');
 
 const student_register = async (req, res) => {
     try {
+        const password = req.body.password;
         const {
             student_name,
             last_name,
@@ -50,11 +51,12 @@ const student_register = async (req, res) => {
             !department ||
             !course ||
             !semester ||
-            total_fee === undefined || total_fee === ''
+            total_fee === undefined || total_fee === '' ||
+            typeof password !== 'string' || password.length < 8
         ) {
             return res.status(400).json({
                 success: false,
-                message: 'Please provide all required fields marked with *.'
+                message: 'Please provide all required fields marked with * and a password of at least 8 characters.'
             });
         }
 
@@ -98,11 +100,13 @@ const student_register = async (req, res) => {
 
         const newStudent = new Student(sanitizedData);
         const savedStudent = await newStudent.save();
+        const studentData = savedStudent.toObject();
+        delete studentData.password;
 
         return res.status(201).json({
             success: true,
             message: 'Student registered successfully!',
-            data: savedStudent
+            data: studentData
         });
     } catch (error) {
         console.error('Registration Controller Error:', error);
@@ -326,6 +330,15 @@ const updateStudent = async (req, res) => {
         }
 
         const updateData = { ...req.body };
+        const password = updateData.password;
+        delete updateData.password;
+        if (password !== undefined && password !== '' &&
+            (typeof password !== 'string' || password.length < 8)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Student password must be at least 8 characters long.'
+            });
+        }
         delete updateData._id;
         delete updateData.id;
         delete updateData.__v;
@@ -397,18 +410,13 @@ const updateStudent = async (req, res) => {
             }
         }
 
-        const updatedStudent = await Student.findByIdAndUpdate(
-            student._id,
-            { $set: updateData },
-            { new: true, runValidators: true }
-        );
-
-        if (!updatedStudent) {
-            return res.status(404).json({
-                success: false,
-                message: 'Student not found.'
-            });
+        student.set(updateData);
+        if (password) {
+            student.password = password;
         }
+        await student.save();
+        const updatedStudent = student.toObject();
+        delete updatedStudent.password;
 
         return res.status(200).json({
             success: true,

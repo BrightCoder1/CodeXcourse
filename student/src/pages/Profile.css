@@ -171,6 +171,64 @@
     font-size: 1.02rem;
 }
 
+.profile-table-wrap {
+    overflow-x: auto;
+}
+
+.profile-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: var(--text-primary);
+}
+
+.profile-table tr + tr {
+    border-top: 1px solid var(--border-color);
+}
+
+.profile-table th,
+.profile-table td {
+    padding: 12px 10px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.profile-table th {
+    width: 32%;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 650;
+}
+
+.profile-table td {
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    overflow-wrap: anywhere;
+}
+
+.profile-table td input,
+.profile-table td select {
+    width: 100%;
+    min-height: 38px;
+    padding: 7px 10px;
+    color: var(--text-primary);
+    background: var(--surface-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font: inherit;
+}
+
+.profile-table td input:focus,
+.profile-table td select:focus {
+    border-color: #7c3aed;
+    outline: 2px solid rgba(124, 58, 237, 0.18);
+}
+
+.profile-password-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
 .profile-edit-form {
     display: grid;
     gap: 16px;
@@ -318,6 +376,11 @@
     border-color: #454a58;
 }
 
+.app-container[data-theme='dark'] .profile-table td input,
+.app-container[data-theme='dark'] .profile-table td select {
+    border-color: #454a58;
+}
+
 .app-container[data-theme='dark'] .profile-feedback {
     color: #86efac;
     background: #173427;
@@ -338,6 +401,10 @@
 
 @media (max-width: 820px) {
     .profile-info-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .profile-password-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
@@ -380,6 +447,19 @@
     .profile-info-grid {
         grid-template-columns: 1fr;
         gap: 15px;
+    }
+
+    .profile-table {
+        min-width: 470px;
+    }
+
+    .profile-table th,
+    .profile-table td {
+        padding: 10px 8px;
+    }
+
+    .profile-password-grid {
+        grid-template-columns: 1fr;
     }
 
     .profile-detail-wide {

@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const studentSchema = new mongoose.Schema(
     {
@@ -31,6 +33,11 @@ const studentSchema = new mongoose.Schema(
             unique: true,
             lowercase: true,
             trim: true
+        },
+        password: {
+            type: String,
+            select: false,
+            minlength: [8, 'Password must be at least 8 characters long']
         },
         phone_number: { type: String, required: true, trim: true },
         alternate_phone: { type: String, trim: true },
@@ -128,5 +135,27 @@ const studentSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+studentSchema.pre('save', async function () {
+    if (this.isModified('password') && this.password) {
+        this.password = await bcrypt.hash(this.password, 10);
+    }
+});
+
+studentSchema.methods.comparePassword = function (enteredPassword) {
+    return bcrypt.compare(enteredPassword, this.password);
+};
+
+studentSchema.methods.generateToken = function () {
+    return jwt.sign(
+        {
+            studentId: this._id.toString(),
+            role: 'student',
+            email: this.email
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRE || '7d' }
+    );
+};
 
 module.exports = mongoose.model('Student', studentSchema);

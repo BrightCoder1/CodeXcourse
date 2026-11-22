@@ -1,81 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Icon from '../components/Icon';
 import './CourseList.css';
 
-const courses = [
-  {
-    id: 'dsa001',
-    courseName: 'DSA',
-    courseCode: 'DSA001',
-    instructorName: 'Vishal Kumar',
-    teacherName: 'Vishal',
-    qualification: '12',
-    startingDate: '2026-11-12',
-    endingDate: '2026-11-28',
-    status: 'Inactive',
-    courseImageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=900&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'mern101',
-    courseName: 'Full Stack MERN Bootcamp',
-    courseCode: 'MERN101',
-    instructorName: 'CodeX Team',
-    teacherName: 'Neha Sharma',
-    qualification: 'M.Tech',
-    startingDate: '2026-11-10',
-    endingDate: '2027-01-30',
-    status: 'Active',
-    courseImageUrl: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=900&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'react201',
-    courseName: 'Advanced React & Redux',
-    courseCode: 'REACT201',
-    instructorName: 'Aisha Khan',
-    teacherName: 'Rahul Verma',
-    qualification: '8',
-    startingDate: '2026-12-02',
-    endingDate: '2027-02-28',
-    status: 'Upcoming',
-    courseImageUrl: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=900&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'python101',
-    courseName: 'Python Programming',
-    courseCode: 'PYTHON101',
-    instructorName: 'Priya Singh',
-    teacherName: 'Priya Singh',
-    qualification: 'MCA',
-    startingDate: '2026-08-01',
-    endingDate: '2026-10-30',
-    status: 'Completed',
-    courseImageUrl: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=900&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'node301',
-    courseName: 'Node.js & Express APIs',
-    courseCode: 'NODE301',
-    instructorName: 'Arjun Mehta',
-    teacherName: 'Arjun Mehta',
-    qualification: '6',
-    startingDate: '2026-11-05',
-    endingDate: '2027-01-15',
-    status: 'Active',
-    courseImageUrl: 'https://images.unsplash.com/photo-1555949422-9b5b4b8b2f3b?w=900&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'design110',
-    courseName: 'UI/UX Design Fundamentals',
-    courseCode: 'DESIGN110',
-    instructorName: 'Meera Patel',
-    teacherName: 'Meera Patel',
-    qualification: 'B.Des',
-    startingDate: '2026-11-20',
-    endingDate: '2027-01-20',
-    status: 'Upcoming',
-    courseImageUrl: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=900&auto=format&fit=crop&q=80',
-  },
-];
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/$/, '');
 
 const formatDate = (dateValue) => {
   if (!dateValue) return '—';
@@ -92,8 +19,44 @@ const formatDate = (dateValue) => {
 };
 
 const CourseList = () => {
+  const [courses, setCourses] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadCourses = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage('');
+        const response = await fetch(`${API_URL}/display/course`, {
+          signal: controller.signal,
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.success || !Array.isArray(data.data)) {
+          throw new Error(data.message || 'The server returned an invalid courses response.');
+        }
+
+        setCourses(data.data);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setErrorMessage(error.message || 'Unable to load courses. Please try again.');
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadCourses();
+    return () => controller.abort();
+  }, [retryCount]);
 
   const query = searchQuery.trim().toLowerCase();
   const filteredCourses = courses.filter((course) => {
@@ -118,7 +81,7 @@ const CourseList = () => {
           <p className="course-list-subtitle">Explore your courses, instructors, and class schedules.</p>
         </div>
         <span className="course-count">
-          {courses.length} {courses.length === 1 ? 'course' : 'courses'}
+          {isLoading ? 'Loading courses…' : `${courses.length} ${courses.length === 1 ? 'course' : 'courses'}`}
         </span>
       </header>
 
@@ -146,13 +109,22 @@ const CourseList = () => {
         </label>
       </div>
 
-      {filteredCourses.length > 0 ? (
+      {isLoading ? (
+        <div className="course-list-message" role="status">Loading courses...</div>
+      ) : errorMessage ? (
+        <div className="course-list-error" role="alert">
+          <p>{errorMessage}</p>
+          <button type="button" onClick={() => setRetryCount((count) => count + 1)}>
+            Try again
+          </button>
+        </div>
+      ) : filteredCourses.length > 0 ? (
         <div className="course-card-grid">
           {filteredCourses.map((course) => {
             const status = course.status || 'Active';
 
             return (
-              <article className="course-card" key={course.id}>
+              <article className="course-card" key={course._id}>
                 <div className="course-card-cover">
                   {course.courseImageUrl && (
                     <img

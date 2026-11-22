@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import Icon from './Icon';
 import './Sidebar.css';
 
-const Sidebar = ({ collapsed, onToggle }) => {
+const Sidebar = ({ collapsed, onToggle, onLogout }) => {
     return (
         <aside className={`sidebar-container ${collapsed ? 'collapsed' : ''}`}>
             <div className="sidebar-header">
@@ -101,6 +101,7 @@ const Sidebar = ({ collapsed, onToggle }) => {
                 className="nav-link logout-btn"
                 title={collapsed ? 'Logout' : ''}
                 type="button"
+                onClick={onLogout}
             >
                 <Icon name="logout" className="nav-icon" size={20} />
                 {!collapsed && <span className="nav-label">Logout</span>}

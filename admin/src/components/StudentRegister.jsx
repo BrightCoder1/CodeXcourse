@@ -23,6 +23,7 @@ const initialFormData = {
 
   // Contact Details
   email: '',
+  password: '',
   phone_number: '',
   alternate_phone: '',
   address: '',
@@ -194,6 +195,8 @@ const StudentRegister = () => {
     ];
     Object.keys(payload).forEach((key) => {
       if (payload[key] === null) {
+        delete payload[key];
+      } else if (key === 'password' && isEditing && !payload[key]) {
         delete payload[key];
       } else if (payload[key] === '') {
         if (isEditing && numericFields.includes(key)) {
@@ -384,6 +387,21 @@ const StudentRegister = () => {
             <div className="form-group">
               <label>Email Address <span className="required">*</span></label>
               <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="student@example.com" required />
+            </div>
+            <div className="form-group">
+              <label>
+                Student Password {!isEditing && <span className="required">*</span>}
+              </label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder={isEditing ? 'Leave blank to keep current password' : 'At least 8 characters'}
+                autoComplete="new-password"
+                minLength="8"
+                required={!isEditing}
+              />
             </div>
             <div className="form-group">
               <label>Phone Number <span className="required">*</span></label>
