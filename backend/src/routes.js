@@ -46,6 +46,7 @@ const {
   saveAdminEmployeeAttendance,
   getAdminAssignments,
   getAdminCourseStudents,
+  saveAdminCourseAttendance,
   saveAdminCourseStudents,
   updateAdminAssignments,
   getAttendanceSummary,
@@ -122,6 +123,7 @@ router.put("/attendance/admin/employees/:employeeId", staffAuth, attendanceAdmin
 router.get("/attendance/admin/assignments", staffAuth, attendanceAdminAuth, getAdminAssignments);
 router.put("/attendance/admin/assignments", staffAuth, attendanceAdminAuth, updateAdminAssignments);
 router.get("/attendance/admin/courses/:courseId/students", staffAuth, attendanceAdminAuth, getAdminCourseStudents);
+router.put("/attendance/admin/courses/:courseId/students/:studentId", staffAuth, attendanceAdminAuth, saveAdminCourseAttendance);
 router.put("/attendance/admin/courses/:courseId/students", staffAuth, attendanceAdminAuth, saveAdminCourseStudents);
 
 router.get("/attendance/student", studentAuth, getStudentAttendanceDashboard);

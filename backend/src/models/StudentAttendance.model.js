@@ -23,7 +23,7 @@ const studentAttendanceSchema = new mongoose.Schema(
     marked_by: {
       type: mongoose.Schema.Types.ObjectId,
       refPath: "marked_by_model",
-      required: true,
+      required: false,
     },
     marked_by_model: {
       type: String,
@@ -33,7 +33,7 @@ const studentAttendanceSchema = new mongoose.Schema(
     },
     marked_by_type: {
       type: String,
-      enum: ["student", "teacher", "admin"],
+      enum: ["student", "teacher", "admin", "system"],
       default: "teacher",
       required: true,
     },

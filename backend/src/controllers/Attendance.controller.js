@@ -378,6 +378,15 @@ const getAdminCourseStudents = async (req, res) => {
     if (!validId(req.params.courseId)) {
       return res.status(400).json({ success: false, message: "Invalid course ID." });
     }
+    const date = req.query?.date === undefined
+      ? null
+      : parseDate(req.query.date);
+    if (req.query?.date !== undefined && !date) {
+      return res.status(400).json({
+        success: false,
+        message: "Attendance date must be a valid, non-future date in YYYY-MM-DD format.",
+      });
+    }
     const course = await Course.findById(req.params.courseId)
       .select("_id courseName courseCode");
     if (!course) {
@@ -393,15 +402,89 @@ const getAdminCourseStudents = async (req, res) => {
         : matchesLegacyCourseEnrollment(student.course, course))
       .map((student) => student._id.toString());
 
+    let attendanceByStudent = {};
+    if (date && assignedStudentIds.length) {
+      const attendanceRecords = await StudentAttendance.find({
+        course_id: course._id,
+        date,
+        student_id: { $in: assignedStudentIds },
+      }).select("student_id status check_in check_out total_minutes leave_reason marked_at marked_by_type");
+      attendanceByStudent = Object.fromEntries(
+        attendanceRecords.map((record) => [record.student_id.toString(), record])
+      );
+    }
+
     return res.json({
       success: true,
       data: {
         students: students.map((student) => student.toObject()),
         assignedStudentIds,
+        attendanceByStudent,
       },
     });
   } catch (error) {
     return sendServerError(res, error, "Failed to fetch course students.");
+  }
+};
+
+const saveAdminCourseAttendance = async (req, res) => {
+  try {
+    const { courseId, studentId } = req.params;
+    const date = parseDate(req.body?.date);
+    const status = req.body?.status;
+    if (!validId(courseId) || !validId(studentId) || !date ||
+        !ADMIN_EDITABLE_STATUSES.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide a valid course, student, non-future date, and attendance status.",
+      });
+    }
+
+    const course = await Course.findById(courseId).select("_id courseName courseCode");
+    if (!course) {
+      return res.status(404).json({ success: false, message: "Course was not found." });
+    }
+    const student = await Student.findOne({
+      $and: [{ _id: studentId }, courseStudentQuery(course)],
+    }).select("_id");
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student is not enrolled in this course.",
+      });
+    }
+
+    const now = new Date();
+    const record = await StudentAttendance.findOneAndUpdate(
+      { student_id: student._id, course_id: course._id, date },
+      {
+        $set: {
+          status,
+          marked_by: req.user._id,
+          marked_by_model: "User",
+          marked_by_type: "admin",
+          marked_at: now,
+        },
+        $setOnInsert: { created_at: now },
+      },
+      { new: true, upsert: true, runValidators: true },
+    )
+      .populate("student_id", "student_name middle_name last_name roll_number application_number")
+      .populate("course_id", "courseName courseCode")
+      .populate("marked_by", "emp_name");
+    return res.json({
+      success: true,
+      message: "Student attendance saved.",
+      data: { ...record.toObject(), record_type: "course" },
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Attendance was updated at the same time. Refresh and try again.",
+      });
+    }
+    return sendServerError(res, error, "Failed to save student attendance.");
   }
 };
 
@@ -650,6 +733,7 @@ module.exports = {
   saveAdminEmployeeAttendance,
   getAdminAssignments,
   getAdminCourseStudents,
+  saveAdminCourseAttendance,
   saveAdminCourseStudents,
   updateAdminAssignments,
   getAttendanceSummary,

@@ -71,6 +71,7 @@ function StatusSelect({ value, onChange, label }) {
       aria-label={label}
     >
       <option value="">Select status</option>
+      {value === "in_progress" && <option value="in_progress" disabled>Checked in</option>}
       {STATUS_OPTIONS.map((status) => (
         <option key={status} value={status}>{STATUS_LABELS[status]}</option>
       ))}
@@ -378,6 +379,11 @@ function AdminAttendance() {
   const [studentFilters, setStudentFilters] = useState({ courseId: "", from: "", to: "", name: "", studentId: "", status: "" });
   const [employeeFilters, setEmployeeFilters] = useState({ from: "", to: "", name: "", status: "" });
   const [markDate, setMarkDate] = useState(today());
+  const [classCourseId, setClassCourseId] = useState("");
+  const [studentMarkDate, setStudentMarkDate] = useState(today());
+  const [classRoster, setClassRoster] = useState([]);
+  const [classStatusDrafts, setClassStatusDrafts] = useState({});
+  const [loadedClassRosterKey, setLoadedClassRosterKey] = useState("");
   const [dailyEmployees, setDailyEmployees] = useState({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
@@ -403,6 +409,7 @@ function AdminAttendance() {
       ]);
       setSummary(summaryData);
       setCourses(assignmentData.courses);
+      setClassCourseId(assignmentData.courses[0]?._id || "");
       setTeachers(assignmentData.teachers);
       setAssignments(assignmentData.assignments);
       setLoadedStudentRecords(studentRecords);
@@ -426,6 +433,7 @@ function AdminAttendance() {
         if (!active) return;
         setSummary(summaryData);
         setCourses(assignmentData.courses);
+        setClassCourseId(assignmentData.courses[0]?._id || "");
         setTeachers(assignmentData.teachers);
         setAssignments(assignmentData.assignments);
         setLoadedStudentRecords(studentRecords);
@@ -439,6 +447,35 @@ function AdminAttendance() {
       });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!classCourseId || !studentMarkDate) return;
+    let active = true;
+    const rosterKey = `${classCourseId}:${studentMarkDate}`;
+    attendanceServices.getCourseStudents(classCourseId, studentMarkDate)
+      .then(({ students, assignedStudentIds, attendanceByStudent = {} }) => {
+        if (!active) return;
+        const assignedIds = new Set(assignedStudentIds);
+        const roster = students
+          .filter((student) => assignedIds.has(student._id))
+          .map((student) => ({
+            ...student,
+            attendance: attendanceByStudent[student._id] || null,
+          }));
+        setClassRoster(roster);
+        setClassStatusDrafts(roster.reduce((drafts, student) => ({
+          ...drafts,
+          [student._id]: student.attendance?.status || "",
+        }), {}));
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.message);
+      })
+      .finally(() => {
+        if (active) setLoadedClassRosterKey(rosterKey);
+      });
+    return () => { active = false; };
+  }, [classCourseId, studentMarkDate]);
 
   useEffect(() => {
     if (!markDate || !teachers.length) return;
@@ -499,6 +536,33 @@ function AdminAttendance() {
       setStudentStatusDrafts((drafts) => ({ ...drafts, [record._id]: updatedRecord.status }));
       setNotice("Student attendance status updated.");
       setSummary(await attendanceServices.getSummary());
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSavingId("");
+    }
+  };
+
+  const saveClassAttendance = async (student) => {
+    const status = classStatusDrafts[student._id];
+    if (!status || status === student.attendance?.status) return;
+    setSavingId(student._id);
+    setError("");
+    setNotice("");
+    try {
+      const response = await attendanceServices.saveCourseAttendance(
+        classCourseId,
+        student._id,
+        { date: studentMarkDate, status },
+      );
+      setClassRoster((roster) => roster.map((item) =>
+        item._id === student._id ? { ...item, attendance: response.data } : item
+      ));
+      setClassStatusDrafts((drafts) => ({ ...drafts, [student._id]: response.data.status }));
+      setNotice(`Attendance saved for ${fullName(student)}.`);
+      if (studentMarkDate === today()) {
+        setSummary(await attendanceServices.getSummary());
+      }
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -620,6 +684,81 @@ function AdminAttendance() {
           <button type="button" key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{label}</button>
         ))}
       </nav>
+
+      {tab === "students" && (
+        <section className="attendance-panel">
+          <div className="attendance-section-heading">
+            <div>
+              <h2>Mark course attendance</h2>
+              <p>Set attendance for any enrolled student. Missing attendance is marked absent automatically after 24 hours.</p>
+            </div>
+            <label className="date-only-label">
+              Date
+              <input
+                type="date"
+                max={today()}
+                value={studentMarkDate}
+                onChange={(event) => setStudentMarkDate(event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="attendance-filter-row">
+            <label>
+              Course
+              <select value={classCourseId} onChange={(event) => setClassCourseId(event.target.value)}>
+                <option value="">Choose a course</option>
+                {courses.map((course) => (
+                  <option value={course._id} key={course._id}>{course.courseName} · {course.courseCode}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {!classCourseId ? (
+            <p className="attendance-empty">Select a course to load its enrolled students.</p>
+          ) : !studentMarkDate ? (
+            <p className="attendance-empty">Select an attendance date to load the roster.</p>
+          ) : loadedClassRosterKey !== `${classCourseId}:${studentMarkDate}` ? (
+            <p className="attendance-empty">Loading enrolled students…</p>
+          ) : classRoster.length ? (
+            <div className="attendance-table-wrap">
+              <table className="attendance-table">
+                <thead><tr><th>Student</th><th>Roll number</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>{classRoster.map((student) => {
+                  const status = classStatusDrafts[student._id] || "";
+                  return (
+                    <tr key={student._id}>
+                      <td>{fullName(student)}</td>
+                      <td>{student.roll_number || student.application_number || "—"}</td>
+                      <td>
+                        <StatusSelect
+                          value={status}
+                          label={`Attendance status for ${fullName(student)}`}
+                          onChange={(value) => setClassStatusDrafts((drafts) => ({
+                            ...drafts,
+                            [student._id]: value,
+                          }))}
+                        />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="attendance-secondary-button compact"
+                          disabled={!status || status === student.attendance?.status || savingId === student._id}
+                          onClick={() => saveClassAttendance(student)}
+                        >
+                          {savingId === student._id ? "Saving…" : "Save"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="attendance-empty">No students are enrolled in this course.</p>
+          )}
+        </section>
+      )}
 
       {tab === "students" && (
         <section className="attendance-panel">

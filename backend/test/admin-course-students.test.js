@@ -3,6 +3,8 @@ const test = require("node:test");
 const mongoose = require("mongoose");
 const Course = require("../src/models/Course.model");
 const Student = require("../src/models/Student.models");
+const StudentAttendance = require("../src/models/StudentAttendance.model");
+const { todayString } = require("../src/utils/attendanceUtils");
 const {
   getAdminCourseStudents,
   saveAdminCourseStudents,
@@ -75,6 +77,45 @@ test("admin course student list includes explicit and legacy enrollments", async
       explicitStudent._id.toString(),
       legacyStudent._id.toString(),
     ]);
+  } finally {
+    restore();
+  }
+});
+
+test("admin attendance roster returns existing records for enrolled students", async () => {
+  const courseId = new mongoose.Types.ObjectId();
+  const studentId = new mongoose.Types.ObjectId();
+  const attendance = {
+    student_id: studentId,
+    status: "late",
+  };
+  const restore = replaceMethods([
+    [Course, "findById", () => selectedQuery({
+      _id: courseId,
+      courseName: "Web Development",
+      courseCode: "WEB101",
+    })],
+    [Student, "find", () => sortedStudentQuery([{
+      _id: studentId,
+      course_ids: [courseId],
+      toObject() { return this; },
+    }])],
+    [StudentAttendance, "find", (filter) => {
+      assert.equal(filter.course_id, courseId);
+      assert.equal(filter.date.toISOString().slice(0, 10), todayString());
+      return { select: async () => [attendance] };
+    }],
+  ]);
+  try {
+    const res = response();
+    await getAdminCourseStudents({
+      params: { courseId: courseId.toString() },
+      query: { date: todayString() },
+    }, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.data.assignedStudentIds[0], studentId.toString());
+    assert.equal(res.body.data.attendanceByStudent[studentId.toString()].status, "late");
   } finally {
     restore();
   }

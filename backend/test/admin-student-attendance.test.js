@@ -6,8 +6,12 @@ const StudentAttendance = require("../src/models/StudentAttendance.model");
 const {
   getAdminStudentAttendance,
   getAttendanceSummary,
+  saveAdminCourseAttendance,
   saveAdminStudentAttendance,
 } = require("../src/controllers/Attendance.controller");
+const { todayString } = require("../src/utils/attendanceUtils");
+const Course = require("../src/models/Course.model");
+const Student = require("../src/models/Student.models");
 
 const createResponse = () => ({
   statusCode: 200,
@@ -167,6 +171,59 @@ test("admin can change a student's course attendance status", async () => {
     assert.equal(Object.hasOwn(update[1].$set, "check_in"), false);
     assert.equal(Object.hasOwn(update[1].$set, "check_out"), false);
     assert.equal(response.body.data.record_type, "course");
+  } finally {
+    restore();
+  }
+});
+
+test("admin can create attendance for an enrolled student without a prior record", async () => {
+  const courseId = new mongoose.Types.ObjectId();
+  const studentId = new mongoose.Types.ObjectId();
+  const adminId = new mongoose.Types.ObjectId();
+  const savedRecord = {
+    _id: new mongoose.Types.ObjectId(),
+    status: "present",
+    toObject() {
+      return { ...this };
+    },
+  };
+  const saveQuery = {
+    populate() {
+      return this;
+    },
+    then(resolve, reject) {
+      return Promise.resolve(savedRecord).then(resolve, reject);
+    },
+  };
+  let update;
+  const restore = replaceMethods([
+    [Course, "findById", () => ({
+      select: async () => ({ _id: courseId, courseName: "Web Development" }),
+    })],
+    [Student, "findOne", (filter) => {
+      assert.equal(filter.$and[0]._id, studentId.toString());
+      return { select: async () => ({ _id: studentId }) };
+    }],
+    [StudentAttendance, "findOneAndUpdate", (...args) => {
+      update = args;
+      return saveQuery;
+    }],
+  ]);
+  try {
+    const response = createResponse();
+    await saveAdminCourseAttendance({
+      params: { courseId: courseId.toString(), studentId: studentId.toString() },
+      body: { date: todayString(), status: "present" },
+      user: { _id: adminId },
+    }, response);
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(update[0].student_id, studentId);
+    assert.equal(update[0].course_id, courseId);
+    assert.equal(update[1].$set.status, "present");
+    assert.equal(update[1].$set.marked_by, adminId);
+    assert.equal(update[1].$set.marked_by_type, "admin");
+    assert.equal(update[2].upsert, true);
   } finally {
     restore();
   }

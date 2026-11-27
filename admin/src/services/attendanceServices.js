@@ -58,7 +58,13 @@ const attendanceServices = {
   getAdminAssignments: () => getData("/admin/assignments"),
   saveAssignments: (payload) =>
     sendMutation(API.put("/admin/assignments", payload)),
-  getCourseStudents: (courseId) => getData(`/admin/courses/${encodeURIComponent(courseId)}/students`),
+  getCourseStudents: (courseId, date) =>
+    getData(`/admin/courses/${encodeURIComponent(courseId)}/students`, date ? { date } : undefined),
+  saveCourseAttendance: (courseId, studentId, payload) =>
+    sendMutation(API.put(
+      `/admin/courses/${encodeURIComponent(courseId)}/students/${encodeURIComponent(studentId)}`,
+      payload,
+    )),
   saveCourseStudents: (courseId, payload) =>
     sendMutation(API.put(`/admin/courses/${encodeURIComponent(courseId)}/students`, payload)),
   getStudentAttendance: (params) => getData("/admin/students", params),
