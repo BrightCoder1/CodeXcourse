@@ -89,7 +89,7 @@ const Contact = () => {
                     </h2>
                     <p className="contact-subtitle">
                         Whether you want guidance choosing a track, need enterprise batch training,
-                        or want to know more about placement records—our team responds within 2 business hours.
+                        or want to know more about placement records—our team responds within 72 hours.
                     </p>
                 </div>
 
@@ -162,14 +162,14 @@ const Contact = () => {
                                 <h3>Message Sent Successfully!</h3>
                                 <p>
                                     Thank you, <strong>{submittedName || 'Student'}</strong>. One of our senior academic
-                                    counselors will get in touch with you shortly.
+                                    counselors will get in touch with you within 72 hours.
                                 </p>
                             </div>
                         ) : (
                             <form onSubmit={handleSubmit} className="contact-form">
                                 <div className="form-head">
                                     <h3>Send a Message</h3>
-                                    <p>Fill out the details below and we will get back to you promptly.</p>
+                                    <p>Fill out the details below and our team will get back to you within 72 hours.</p>
                                 </div>
 
                                 {submitError && <p className="form-error" role="alert">{submitError}</p>}

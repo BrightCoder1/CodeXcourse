@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/$/, '');
 const courseStatuses = ['Active', 'Upcoming', 'Completed', 'Inactive'];
@@ -14,6 +16,7 @@ const formatDate = (date) => {
 };
 
 const Course = () => {
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('all');
     const [courses, setCourses] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -135,6 +138,28 @@ const Course = () => {
                                         <span>Ends: {formatDate(course.endingDate)}</span>
                                     </div>
                                 </div>
+                                
+                                {['active', 'upcoming'].includes((course.status || '').toLowerCase()) && (
+                                    <button type="button"
+                                        className="enroll-btn"
+                                        onClick={() => {
+                                            toast.info('Please fill out this form, and our team will contact you within 72 hours.');
+                                            navigate('/', { state: { targetSection: 'contact' } });
+                                        }}
+                                    >
+                                        Enroll Now
+                                    </button>
+                                )}
+                                {course.status?.toLowerCase() === 'completed' && (
+                                    <button type="button" className="enroll-btn enroll-btn-completed" disabled>
+                                        Completed
+                                    </button>
+                                )}
+                                {course.status?.toLowerCase() === 'inactive' && (
+                                    <button type="button" className="enroll-btn enroll-btn-inactive" disabled>
+                                        Inactive
+                                    </button>
+                                )}
                             </article>
                         ))}
                     </div>

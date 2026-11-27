@@ -1443,6 +1443,7 @@
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  align-self: center;
   gap: 0.45rem;
   transition: all 0.25s ease;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
@@ -1452,6 +1453,22 @@
   background: #1d4ed8;
   transform: translateY(-2px);
   box-shadow: 0 8px 18px rgba(37, 99, 235, 0.3);
+}
+
+.enroll-btn-completed,
+.enroll-btn-completed:hover {
+  background: #16a34a;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.enroll-btn-inactive,
+.enroll-btn-inactive:hover {
+  background: #dc2626;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .enroll-btn .arrow {
